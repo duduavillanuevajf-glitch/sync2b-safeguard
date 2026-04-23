@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    image: sync2b-safeguard:local
+    container_name: safeguard-api
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://safeguard:secret@postgres:5432/safeguard
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-changeme_access_secret_dev_64chars_xxxx}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-changeme_refresh_secret_dev_64chars_xxx}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3001}
+      LOG_PRETTY: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    command: npm run dev
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: safeguard-postgres
+    environment:
+      POSTGRES_DB: safeguard
+      POSTGRES_USER: safeguard
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U safeguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: safeguard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    command: redis-server --save 60 1 --loglevel warning
+
+  # Optional: HashiCorp Vault in dev mode
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: safeguard-vault
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    profiles:
+      - vault
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,14 @@
+node_modules
+coverage
+.git
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+Dockerfile
+docker-compose*.yml
+.dockerignore
+tests/
+.github/
+sync2b-safeguard.html

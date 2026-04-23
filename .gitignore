@@ -1,0 +1,16 @@
+node_modules/
+coverage/
+dist/
+.env
+.env.local
+.env.*.local
+*.log
+npm-debug.log*
+pino.log
+uploads/
+tmp/
+.DS_Store
+Thumbs.db
+*.pem
+*.key
+*.crt
