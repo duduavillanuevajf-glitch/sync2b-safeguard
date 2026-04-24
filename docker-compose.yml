@@ -8,7 +8,7 @@ services:
     expose:
       - "3000"
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       DATABASE_URL: postgresql://safeguard:secret@postgres:5432/safeguard
       REDIS_URL: redis://redis:6379
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-changeme_access_secret_dev_64chars_xxxx}
@@ -16,16 +16,18 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
-      LOG_PRETTY: "true"
+      LOG_PRETTY: "false"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./:/app
-      - /app/node_modules
-    command: npm run dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/healthz || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   postgres:
@@ -49,8 +51,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: safeguard-redis
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -69,7 +71,8 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
   # Optional: HashiCorp Vault in dev mode
