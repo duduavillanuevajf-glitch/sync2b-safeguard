@@ -22,11 +22,22 @@ app.use(helmet({
 }));
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3001').split(',');
+// CORS_ORIGINS: lista separada por vírgula de origens permitidas.
+// Suporta múltiplos ambientes: http://192.168.x.x, https://app.empresa.com, etc.
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error(`CORS: origin ${origin} not allowed`));
+    // Sem header Origin = requisição server-to-server ou same-origin — permitir.
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    // Rejeitar sem lançar erro (cb com Error → Express error handler → 500).
+    // cb(null, false) simplesmente omite os headers CORS; o browser bloqueia no lado cliente.
+    logger.warn({ origin, allowedOrigins }, 'CORS: origin blocked');
+    cb(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
