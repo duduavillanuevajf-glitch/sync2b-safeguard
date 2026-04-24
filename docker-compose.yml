@@ -60,6 +60,18 @@ services:
       retries: 10
     command: redis-server --save 60 1 --loglevel warning
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: sync2b-safeguard-frontend:local
+    container_name: safeguard-frontend
+    ports:
+      - "3001:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
   # Optional: HashiCorp Vault in dev mode
   vault:
     image: hashicorp/vault:1.17
