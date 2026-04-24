@@ -4,7 +4,13 @@ import type { AuthTokens, User } from '@/types'
 export const authService = {
   async login(email: string, password: string) {
     const { data } = await api.post('/auth/login', { email, password })
-    return data.data as { tempToken: string; requiresTwoFactor: boolean }
+    return data.data as {
+      requiresTwoFactor: boolean
+      tempToken?: string
+      accessToken?: string
+      refreshToken?: string
+      expiresIn?: string
+    }
   },
 
   async verify2FA(tempToken: string, totpCode: string) {

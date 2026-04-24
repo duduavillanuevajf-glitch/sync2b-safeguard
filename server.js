@@ -8,6 +8,7 @@ const db = require('./src/config/database');
 const redis = require('./src/config/redis');
 const secrets = require('./src/config/secrets');
 const { startJobs } = require('./src/jobs');
+const { seedAdminUser } = require('./scripts/seed');
 const logger = require('./src/config/logger');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -18,6 +19,7 @@ async function start() {
 
   await secrets.initVault();
   await db.connect();
+  await seedAdminUser();
   await redis.client.connect().catch(() => logger.warn('Redis not available, running without cache'));
 
   const server = http.createServer(app);

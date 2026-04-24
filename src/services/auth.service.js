@@ -98,7 +98,7 @@ async function register({ orgName, orgSlug, email, password, firstName, lastName
 
 // ── Login step 1: email + password ───────────────────────────────────────────
 
-async function loginStep1({ email, password, ipAddress }) {
+async function loginStep1({ email, password, ipAddress, userAgent }) {
   const user = await userRepo.findByEmailAcrossOrgs(email);
 
   if (!user) throw new AuthenticationError('Credenciais inválidas');
@@ -124,6 +124,33 @@ async function loginStep1({ email, password, ipAddress }) {
     throw new AuthenticationError('Credenciais inválidas');
   }
 
+  // Se TOTP não está configurado, completa a autenticação imediatamente no step 1.
+  // O usuário será redirecionado para configurar o 2FA após o primeiro acesso.
+  if (!user.otp_enabled && !user.otp_secret) {
+    await userRepo.resetFailedAttempts(user.id);
+
+    const { accessToken, rawRefresh, refreshHash, familyId, expiresAt } = await _signTokens(user);
+    await tokenRepo.createRefreshToken({
+      userId: user.id, tokenHash: refreshHash, familyId, expiresAt, ipAddress, userAgent,
+    });
+
+    await auditRepo.log({
+      organizationId: user.organization_id,
+      userId: user.id,
+      action: 'LOGIN_SUCCESS',
+      ipAddress,
+      metadata: { twoFactor: false, userAgent },
+    });
+
+    return {
+      requiresTwoFactor: false,
+      accessToken,
+      refreshToken: rawRefresh,
+      expiresIn: ACCESS_TTL,
+    };
+  }
+
+  // TOTP configurado — emite token temporário para o step 2
   const { accessSecret } = await secrets.getJwtSecrets();
   const tempToken = jwt.sign(
     { sub: user.id, org: user.organization_id, type: 'temp' },
@@ -131,7 +158,7 @@ async function loginStep1({ email, password, ipAddress }) {
     { expiresIn: '5m' }
   );
 
-  return { tempToken, requiresTwoFactor: user.otp_enabled || !!user.otp_secret };
+  return { tempToken, requiresTwoFactor: true };
 }
 
 // ── Login step 2: TOTP verification ──────────────────────────────────────────

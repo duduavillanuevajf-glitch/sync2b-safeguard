@@ -35,7 +35,14 @@ export function Login() {
     setLoading(true); setError('')
     try {
       const res = await authService.login(data.email, data.password)
-      setTempToken(res.tempToken)
+      if (!res.requiresTwoFactor && res.accessToken && res.refreshToken) {
+        setTokens(res.accessToken, res.refreshToken)
+        const user = await authService.getProfile()
+        setUser(user)
+        navigate('/setup-2fa')
+        return
+      }
+      setTempToken(res.tempToken ?? '')
       setStep('totp')
     } catch (e: any) {
       setError(e.response?.data?.error?.message || 'Credenciais inválidas')
