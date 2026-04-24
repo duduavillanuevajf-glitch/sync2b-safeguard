@@ -9,7 +9,7 @@ RUN npm ci --only=production && npm cache clean --force
 FROM node:20-alpine AS production
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init curl
 
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -22,8 +22,8 @@ COPY --from=deps --chown=safeguard:nodejs /app/node_modules ./node_modules
 COPY --chown=safeguard:nodejs . .
 
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/healthz || exit 1
+HEALTHCHECK --interval=15s --timeout=10s --start-period=20s --retries=5 \
+  CMD curl -fs http://localhost:3000/healthz || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server.js"]
