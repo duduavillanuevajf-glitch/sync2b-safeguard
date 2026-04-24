@@ -5,8 +5,8 @@ services:
     build: .
     image: sync2b-safeguard:local
     container_name: safeguard-api
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://safeguard:secret@postgres:5432/safeguard
@@ -15,7 +15,7 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-changeme_refresh_secret_dev_64chars_xxx}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3001}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       LOG_PRETTY: "true"
     depends_on:
       postgres:
@@ -67,7 +67,7 @@ services:
     image: sync2b-safeguard-frontend:local
     container_name: safeguard-frontend
     ports:
-      - "3001:80"
+      - "80:80"
     depends_on:
       - api
     restart: unless-stopped
