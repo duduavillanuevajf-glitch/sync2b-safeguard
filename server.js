@@ -9,6 +9,7 @@ const redis = require('./src/config/redis');
 const secrets = require('./src/config/secrets');
 const { startJobs } = require('./src/jobs');
 const { seedAdminUser } = require('./scripts/seed');
+const { runMigrations } = require('./scripts/migrate');
 const logger = require('./src/config/logger');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -19,6 +20,7 @@ async function start() {
 
   await secrets.initVault();
   await db.connect();
+  await runMigrations(process.env.DATABASE_URL);
   await seedAdminUser();
   await redis.client.connect().catch(() => logger.warn('Redis not available, running without cache'));
 
