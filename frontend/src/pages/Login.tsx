@@ -26,7 +26,7 @@ export function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const { setTokens } = useAuthStore()
+  const { setTokens, setUser } = useAuthStore()
 
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
   const totpForm = useForm<TotpForm>({ resolver: zodResolver(totpSchema) })
