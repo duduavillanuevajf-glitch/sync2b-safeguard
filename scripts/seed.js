@@ -18,7 +18,8 @@ async function seedAdminUser() {
     const orgRes = await db.query(
       `INSERT INTO organizations (id, name, slug, plan, max_users, max_vault_items)
        VALUES ($1, $2, $3, 'enterprise', 9999, 999999)
-       ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+       ON CONFLICT (slug) DO UPDATE
+         SET name = EXCLUDED.name, is_active = TRUE
        RETURNING id`,
       [uuid(), SEED_ORG_NAME, SEED_ORG_SLUG],
     );

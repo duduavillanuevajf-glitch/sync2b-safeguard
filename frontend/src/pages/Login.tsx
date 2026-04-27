@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, Lock, Mail, ArrowRight, Loader2, Smartphone } from 'lucide-react'
+import { Shield, Lock, Mail, ArrowRight, Loader2, Smartphone, Eye, EyeOff } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -25,6 +25,7 @@ export function Login() {
   const [tempToken, setTempToken] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
   const { setTokens, setUser } = useAuthStore()
 
@@ -74,11 +75,11 @@ export function Login() {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-txt-primary mb-1">
-            {step === 'credentials' ? 'Bem-vindo de volta' : 'Verificação 2FA'}
+            {step === 'credentials' ? 'Acesso Corporativo' : 'Verificação 2FA'}
           </h2>
           <p className="text-txt-secondary text-sm">
             {step === 'credentials'
-              ? 'Acesse o cofre corporativo com segurança'
+              ? 'Autentique-se para acessar o cofre seguro'
               : 'Insira o código do Google Authenticator'}
           </p>
         </div>
@@ -131,11 +132,23 @@ export function Login() {
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-txt-muted" />
                   <input
                     {...loginForm.register('password')}
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••••••"
-                    className="input-field pl-10 font-mono"
+                    className="input-field pl-10 pr-10 font-mono"
                     autoComplete="current-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-primary transition-colors"
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  >
+                    {showPassword
+                      ? <EyeOff className="w-4 h-4" />
+                      : <Eye className="w-4 h-4" />
+                    }
+                  </button>
                 </div>
                 {loginForm.formState.errors.password && (
                   <p className="text-danger text-xs">{loginForm.formState.errors.password.message}</p>
@@ -157,7 +170,7 @@ export function Login() {
               )}
 
               <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 h-11">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continuar <ArrowRight className="w-4 h-4" /></>}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Entrar <ArrowRight className="w-4 h-4" /></>}
               </button>
             </motion.form>
           ) : (
