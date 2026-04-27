@@ -33,7 +33,7 @@ describe('AuthService.loginStep1', () => {
   };
 
   beforeEach(async () => {
-    const bcrypt = require('bcrypt');
+    const bcrypt = require('bcryptjs');
     baseUser.password_hash = await bcrypt.hash('correct-password', 4);
     userRepo.findByEmailAcrossOrgs.mockResolvedValue(baseUser);
   });

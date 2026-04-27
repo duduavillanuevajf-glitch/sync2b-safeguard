@@ -18,7 +18,8 @@ api.interceptors.response.use(
   (r) => r,
   async (err: AxiosError) => {
     const original = err.config as InternalAxiosRequestConfig & { _retry?: boolean }
-    if (err.response?.status === 401 && !original._retry) {
+    const isAuthEndpoint = original.url?.startsWith('/auth/')
+    if (err.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true
       const refresh = localStorage.getItem('refresh_token')
       if (refresh) {
