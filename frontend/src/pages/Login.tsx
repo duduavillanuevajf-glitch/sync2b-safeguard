@@ -37,8 +37,13 @@ export function Login() {
       const res = await authService.login(data.email, data.password)
       if (!res.requiresTwoFactor && res.accessToken && res.refreshToken) {
         setTokens(res.accessToken, res.refreshToken)
-        const user = await authService.getProfile()
-        setUser(user)
+        // getProfile is best-effort: failure here must not mask a successful login
+        try {
+          const user = await authService.getProfile()
+          setUser(user)
+        } catch {
+          // token is stored — AuthGuard will re-fetch on next render
+        }
         navigate('/setup-2fa')
         return
       }

@@ -20,7 +20,7 @@ async function register(req, res, next) {
 
 async function login(req, res, next) {
   try {
-    const result = await authService.loginStep1({ ...req.body, ipAddress: _ip(req) });
+    const result = await authService.loginStep1({ ...req.body, ipAddress: _ip(req), userAgent: req.headers['user-agent'] });
     success(res, result, { message: 'Senha válida. Insira o código do Google Authenticator.' });
   } catch (err) { next(err); }
 }

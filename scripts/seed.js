@@ -1,7 +1,7 @@
 'use strict';
 
 require('dotenv').config();
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { v4: uuid } = require('uuid');
 const db = require('../src/config/database');
 const logger = require('../src/config/logger');
@@ -24,9 +24,39 @@ async function seedAdminUser() {
     );
     const orgId = orgRes.rows[0].id;
 
-    // Check for existing user
+    // Look for this email across ALL orgs — handles stale data from prior installations
+    const anyUser = await db.query(
+      `SELECT u.id, u.password_hash, u.organization_id, u.is_active, u.otp_enabled
+       FROM users u
+       JOIN organizations o ON o.id = u.organization_id
+       WHERE u.email = $1
+       LIMIT 1`,
+      [SEED_EMAIL],
+    );
+
+    if (anyUser.rows.length > 0 && anyUser.rows[0].organization_id !== orgId) {
+      // User exists but belongs to a different org — move it to the correct org.
+      // This happens when the volume was re-created and the org got a new UUID.
+      await db.query(
+        `UPDATE users
+         SET organization_id = $1, failed_login_attempts = 0, locked_until = NULL,
+             role = 'super_admin', otp_secret = NULL, otp_enabled = FALSE, is_active = TRUE
+         WHERE id = $2`,
+        [orgId, anyUser.rows[0].id],
+      );
+      // Verify and fix password hash
+      const valid = await bcrypt.compare(SEED_PASSWORD, anyUser.rows[0].password_hash);
+      if (!valid) {
+        const passwordHash = await bcrypt.hash(SEED_PASSWORD, BCRYPT_ROUNDS);
+        await db.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [passwordHash, anyUser.rows[0].id]);
+      }
+      logger.info({ email: SEED_EMAIL, orgId }, 'Seed: admin movido para org correta');
+      return;
+    }
+
+    // Check for existing user in the correct org
     const existing = await db.query(
-      `SELECT id, password_hash FROM users WHERE email = $1 AND organization_id = $2`,
+      `SELECT id, password_hash, is_active, locked_until FROM users WHERE email = $1 AND organization_id = $2`,
       [SEED_EMAIL, orgId],
     );
 
@@ -42,8 +72,9 @@ async function seedAdminUser() {
       return;
     }
 
-    // User exists — verify password hash and fix if stale/wrong
-    const valid = await bcrypt.compare(SEED_PASSWORD, existing.rows[0].password_hash);
+    // User exists in correct org — verify/fix hash, role, lock, and active state
+    const row = existing.rows[0];
+    const valid = await bcrypt.compare(SEED_PASSWORD, row.password_hash);
     if (!valid) {
       const passwordHash = await bcrypt.hash(SEED_PASSWORD, BCRYPT_ROUNDS);
       await db.query(
@@ -51,16 +82,15 @@ async function seedAdminUser() {
          SET password_hash = $1, failed_login_attempts = 0, locked_until = NULL,
              role = 'super_admin', otp_secret = NULL, otp_enabled = FALSE, is_active = TRUE
          WHERE id = $2`,
-        [passwordHash, existing.rows[0].id],
+        [passwordHash, row.id],
       );
       logger.info({ email: SEED_EMAIL }, 'Seed: hash do admin corrigido');
     } else {
-      // Ensure role/otp state are correct even if hash is fine
       await db.query(
         `UPDATE users
          SET failed_login_attempts = 0, locked_until = NULL, role = 'super_admin', is_active = TRUE
          WHERE id = $1`,
-        [existing.rows[0].id],
+        [row.id],
       );
       logger.info({ email: SEED_EMAIL }, 'Seed: admin OK');
     }
