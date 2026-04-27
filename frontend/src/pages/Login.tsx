@@ -26,7 +26,7 @@ export function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const { setTokens, setUser } = useAuthStore()
+  const { setTokens } = useAuthStore()
 
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
   const totpForm = useForm<TotpForm>({ resolver: zodResolver(totpSchema) })
@@ -37,14 +37,7 @@ export function Login() {
       const res = await authService.login(data.email, data.password)
       if (!res.requiresTwoFactor && res.accessToken && res.refreshToken) {
         setTokens(res.accessToken, res.refreshToken)
-        // getProfile is best-effort: failure here must not mask a successful login
-        try {
-          const user = await authService.getProfile()
-          setUser(user)
-        } catch {
-          // token is stored — AuthGuard will re-fetch on next render
-        }
-        navigate('/setup-2fa')
+        navigate('/dashboard', { replace: true })
         return
       }
       setTempToken(res.tempToken ?? '')

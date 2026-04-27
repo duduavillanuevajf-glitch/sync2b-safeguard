@@ -25,6 +25,17 @@ router.post('/2fa/verify',
   controller.verifyTwoFactor
 );
 
+router.post('/2fa/setup',
+  authenticate,
+  controller.setupTwoFactor
+);
+
+router.post('/2fa/confirm',
+  authenticate,
+  validate(schema.confirmTwoFactor),
+  controller.confirmTwoFactor
+);
+
 router.post('/token/refresh',
   validate(schema.refreshToken),
   controller.refreshToken

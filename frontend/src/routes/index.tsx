@@ -24,7 +24,6 @@ export const router = createBrowserRouter([
       { index: true, element: <Login /> },
       { path: 'login', element: <Login /> },
       { path: 'forgot-password', element: <ForgotPassword /> },
-      { path: 'setup-2fa', element: <Setup2FA /> },
     ],
   },
   {
@@ -32,6 +31,7 @@ export const router = createBrowserRouter([
     element: <AuthGuard><AppLayout /></AuthGuard>,
     children: [
       { path: 'dashboard', element: <Dashboard /> },
+      { path: 'setup-2fa', element: <Setup2FA /> },
       { path: 'vault', element: <Vault /> },
       { path: 'vault/:id', element: <VaultDetail /> },
       { path: 'audit', element: <Audit /> },

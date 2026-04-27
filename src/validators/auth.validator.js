@@ -47,4 +47,10 @@ const changePassword = Joi.object({
   newPassword: password.messages({ 'string.min': 'Nova senha deve ter pelo menos 8 caracteres' }),
 });
 
-module.exports = { register, login, verifyTwoFactor, refreshToken, forgotPassword, validateResetToken, resetPassword, changePassword };
+const confirmTwoFactor = Joi.object({
+  code: Joi.string().length(6).pattern(/^\d{6}$/).required()
+    .messages({ 'string.pattern.base': 'Código deve ter 6 dígitos numéricos' }),
+  secret: Joi.string().required(),
+});
+
+module.exports = { register, login, verifyTwoFactor, refreshToken, forgotPassword, validateResetToken, resetPassword, changePassword, confirmTwoFactor };

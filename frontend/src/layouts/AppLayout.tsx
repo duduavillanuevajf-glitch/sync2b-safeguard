@@ -1,9 +1,25 @@
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sidebar } from '@/components/sidebar/Sidebar'
+import { useAuthStore } from '@/store/auth.store'
+import { authService } from '@/services/auth.service'
 
 export function AppLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, setUser, logout } = useAuthStore()
+
+  useEffect(() => {
+    if (!user) {
+      authService.getProfile()
+        .then(setUser)
+        .catch(() => {
+          logout()
+          navigate('/login', { replace: true })
+        })
+    }
+  }, [])
 
   return (
     <div className="flex h-screen bg-bg-base overflow-hidden">

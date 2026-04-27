@@ -1,4 +1,5 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import { useAuthStore } from '@/store/auth.store'
 
 const BASE = import.meta.env.VITE_API_URL || '/api/v2'
 
@@ -31,12 +32,10 @@ api.interceptors.response.use(
           original.headers.Authorization = `Bearer ${tokens.accessToken}`
           return api(original)
         } catch {
-          localStorage.clear()
-          window.location.href = '/login'
+          useAuthStore.getState().logout()
         }
       } else {
-        localStorage.clear()
-        window.location.href = '/login'
+        useAuthStore.getState().logout()
       }
     }
     return Promise.reject(err)

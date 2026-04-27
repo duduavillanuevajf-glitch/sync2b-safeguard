@@ -1,7 +1,11 @@
 'use strict';
 
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
 const authService = require('../services/auth.service');
+const userRepo = require('../repositories/user.repository');
 const { success, created } = require('../utils/response');
+const { AuthenticationError } = require('../utils/errors');
 
 function _ip(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
@@ -80,7 +84,30 @@ async function resetPassword(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function setupTwoFactor(req, res, next) {
+  try {
+    const otpSecret = speakeasy.generateSecret({
+      name: `Sync2B Safeguard (${req.user.email})`,
+      length: 20,
+    });
+    const qr = await qrcode.toDataURL(otpSecret.otpauth_url);
+    success(res, { qr, secret: otpSecret.base32 });
+  } catch (err) { next(err); }
+}
+
+async function confirmTwoFactor(req, res, next) {
+  try {
+    const { code, secret } = req.body;
+    const window = parseInt(process.env.TOTP_WINDOW || '2', 10);
+    const valid = speakeasy.totp.verify({ secret, encoding: 'base32', token: code, window });
+    if (!valid) throw new AuthenticationError('Código inválido');
+    await userRepo.updateOtp(req.user.id, secret);
+    success(res, null, { message: '2FA ativado com sucesso' });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   register, login, verifyTwoFactor, refreshToken, logout,
   forgotPassword, validateResetToken, resetPassword,
+  setupTwoFactor, confirmTwoFactor,
 };
