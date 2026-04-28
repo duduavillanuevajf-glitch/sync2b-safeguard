@@ -99,6 +99,43 @@ async function register({ orgName, orgSlug, email, password, firstName, lastName
 // ── Login step 1: email + password ───────────────────────────────────────────
 
 async function loginStep1({ email, password, ipAddress, userAgent }) {
+  // ── DEBUG LOGIN (remover após diagnóstico) ───────────────────────────────
+  try {
+    console.log('========== LOGIN DEBUG ==========');
+    console.log('EMAIL RECEBIDO:', JSON.stringify(email));
+
+    const rawResult = await db.query(
+      `SELECT u.id, u.email, u.password_hash, u.is_active,
+              u.otp_enabled, u.failed_login_attempts, u.locked_until,
+              o.is_active AS org_active, o.slug AS org_slug
+       FROM users u
+       JOIN organizations o ON o.id = u.organization_id
+       WHERE u.email = $1 LIMIT 1`,
+      [email ? email.toLowerCase() : ''],
+    );
+    const row = rawResult.rows[0];
+    console.log('USER NO BANCO (sem filtro):', row ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+    if (row) {
+      console.log('  email:', row.email);
+      console.log('  is_active:', row.is_active);
+      console.log('  org_active:', row.org_active);
+      console.log('  org_slug:', row.org_slug);
+      console.log('  otp_enabled:', row.otp_enabled);
+      console.log('  failed_login_attempts:', row.failed_login_attempts);
+      console.log('  locked_until:', row.locked_until);
+      console.log('  hash_prefix:', row.password_hash ? row.password_hash.substring(0, 20) : 'NULL');
+      const match = await bcrypt.compare(password, row.password_hash);
+      console.log('  PASSWORD LENGTH:', password ? password.length : 0);
+      console.log('  BCRYPT RESULT:', match);
+    }
+    const viaService = await userRepo.findByEmailAcrossOrgs(email);
+    console.log('findByEmailAcrossOrgs:', viaService ? 'ENCONTRADO' : 'NULL (is_active ou org_active = false)');
+    console.log('=================================');
+  } catch (debugErr) {
+    console.log('DEBUG ERROR:', debugErr.message);
+  }
+  // ── FIM DEBUG ────────────────────────────────────────────────────────────
+
   const user = await userRepo.findByEmailAcrossOrgs(email);
 
   if (!user) throw new AuthenticationError('Credenciais inválidas');
