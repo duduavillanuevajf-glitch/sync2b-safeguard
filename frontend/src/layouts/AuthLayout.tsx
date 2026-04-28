@@ -1,6 +1,5 @@
 import { Outlet } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
 export function AuthLayout() {
@@ -27,11 +26,14 @@ export function AuthLayout() {
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 flex items-center justify-between p-6 sm:p-8"
       >
-        {/* Logo */}
+        {/* Logo oficial */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-brand-gradient rounded-xl flex items-center justify-center shadow-brand">
-            <Logo className="w-5 h-5" white />
-          </div>
+          <img
+            src="/sync2logo.png"
+            alt="Sync2B Safeguard"
+            className="w-10 h-10 rounded-xl object-contain shadow-brand"
+            draggable={false}
+          />
           <span className="font-bold text-xl text-txt-primary tracking-tight">
             Sync2B <span className="text-gradient-brand">Safeguard</span>
           </span>

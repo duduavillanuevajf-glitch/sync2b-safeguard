@@ -21,8 +21,11 @@ async function start() {
   await secrets.initVault();
   await db.connect();
   await runMigrations(process.env.DATABASE_URL);
-  await seedAdminUser();
+
+  // Redis antes do seed para que o seed possa limpar rate limits
   await redis.client.connect().catch(() => logger.warn('Redis not available, running without cache'));
+
+  await seedAdminUser();
 
   const server = http.createServer(app);
 
@@ -44,7 +47,7 @@ async function start() {
   };
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGINT',  () => shutdown('SIGINT'));
 
   process.on('unhandledRejection', (reason) => {
     logger.error({ reason }, 'Unhandled promise rejection');

@@ -7,7 +7,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { authService } from '@/services/auth.service'
 import { useAuthStore } from '@/store/auth.store'
-import { Logo } from '@/components/Logo'
 import { cn } from '@/utils/cn'
 
 const loginSchema = z.object({
@@ -72,8 +71,13 @@ export function Login() {
       >
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex w-16 h-16 rounded-2xl bg-brand-gradient items-center justify-center shadow-brand-lg mb-4 animate-glow-pulse">
-            <Logo className="w-8 h-8" white />
+          <div className="flex justify-center mb-4">
+            <img
+              src="/sync2logo.png"
+              alt="Sync2B Safeguard"
+              className="w-16 h-16 rounded-2xl object-contain shadow-brand-lg animate-glow-pulse"
+              draggable={false}
+            />
           </div>
           <h2 className="text-2xl font-bold text-txt-primary mb-1">
             {step === 'credentials' ? 'Acesso Corporativo' : 'Verificação 2FA'}
@@ -216,7 +220,7 @@ export function Login() {
               )}
 
               <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 h-11">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Acessar <Logo className="w-4 h-4" white /></>}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Acessar <ArrowRight className="w-4 h-4" /></>}
               </button>
 
               <button type="button" onClick={() => { setStep('credentials'); setError('') }}

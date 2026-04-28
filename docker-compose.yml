@@ -16,6 +16,7 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://192.168.2.69,http://localhost:3000,http://localhost:5173}
       LOG_PRETTY: "false"
+      RATE_LIMIT_AUTH_MAX: "30"
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-eduardo@sync2b.com}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Sync2B@2026}
       SEED_ORG_SLUG: ${SEED_ORG_SLUG:-sync2b}

@@ -12,9 +12,24 @@ const SEED_ORG_SLUG = process.env.SEED_ORG_SLUG        || 'sync2b';
 const SEED_ORG_NAME = process.env.SEED_ORG_NAME        || 'Sync2B';
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 
+async function _clearRateLimit(email) {
+  try {
+    const { client: redis } = require('../src/config/redis');
+    if (redis.status !== 'ready') return;
+    const pattern = `rl:auth:*:${email}`;
+    const keys = await redis.keys(pattern);
+    if (keys.length > 0) {
+      await redis.del(...keys);
+      logger.info({ count: keys.length }, 'Seed: rate limit do admin liberado');
+    }
+  } catch {
+    // Redis opcional — falha silenciosa
+  }
+}
+
 async function seedAdminUser() {
   try {
-    // Ensure org exists (idempotent via ON CONFLICT)
+    // Garante que a org existe e está ativa
     const orgRes = await db.query(
       `INSERT INTO organizations (id, name, slug, plan, max_users, max_vault_items)
        VALUES ($1, $2, $3, 'enterprise', 9999, 999999)
@@ -25,9 +40,9 @@ async function seedAdminUser() {
     );
     const orgId = orgRes.rows[0].id;
 
-    // Look for this email across ALL orgs — handles stale data from prior installations
+    // Procura o usuário em qualquer org (lida com volumes reutilizados)
     const anyUser = await db.query(
-      `SELECT u.id, u.password_hash, u.organization_id, u.is_active, u.otp_enabled
+      `SELECT u.id, u.organization_id
        FROM users u
        JOIN organizations o ON o.id = u.organization_id
        WHERE u.email = $1
@@ -35,34 +50,32 @@ async function seedAdminUser() {
       [SEED_EMAIL],
     );
 
+    // Sempre gera um hash novo para garantir consistência
+    const passwordHash = await bcrypt.hash(SEED_PASSWORD, BCRYPT_ROUNDS);
+
     if (anyUser.rows.length > 0 && anyUser.rows[0].organization_id !== orgId) {
-      // User exists but belongs to a different org — move it to the correct org.
-      // This happens when the volume was re-created and the org got a new UUID.
+      // Usuário em org diferente: mover para org correta
       await db.query(
         `UPDATE users
-         SET organization_id = $1, failed_login_attempts = 0, locked_until = NULL,
-             role = 'super_admin', otp_secret = NULL, otp_enabled = FALSE, is_active = TRUE
-         WHERE id = $2`,
-        [orgId, anyUser.rows[0].id],
+         SET organization_id = $1, password_hash = $2,
+             failed_login_attempts = 0, locked_until = NULL,
+             role = 'super_admin', otp_secret = NULL, otp_enabled = FALSE,
+             is_active = TRUE
+         WHERE id = $3`,
+        [orgId, passwordHash, anyUser.rows[0].id],
       );
-      // Verify and fix password hash
-      const valid = await bcrypt.compare(SEED_PASSWORD, anyUser.rows[0].password_hash);
-      if (!valid) {
-        const passwordHash = await bcrypt.hash(SEED_PASSWORD, BCRYPT_ROUNDS);
-        await db.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [passwordHash, anyUser.rows[0].id]);
-      }
-      logger.info({ email: SEED_EMAIL, orgId }, 'Seed: admin movido para org correta');
+      logger.info({ email: SEED_EMAIL, orgId }, 'Seed: admin movido e senha corrigida');
+      await _clearRateLimit(SEED_EMAIL);
       return;
     }
 
-    // Check for existing user in the correct org
     const existing = await db.query(
-      `SELECT id, password_hash, is_active, locked_until FROM users WHERE email = $1 AND organization_id = $2`,
+      `SELECT id FROM users WHERE email = $1 AND organization_id = $2`,
       [SEED_EMAIL, orgId],
     );
 
     if (existing.rows.length === 0) {
-      const passwordHash = await bcrypt.hash(SEED_PASSWORD, BCRYPT_ROUNDS);
+      // Criar do zero
       await db.query(
         `INSERT INTO users
            (id, organization_id, email, password_hash, otp_secret, otp_enabled, role, first_name, last_name)
@@ -70,31 +83,19 @@ async function seedAdminUser() {
         [uuid(), orgId, SEED_EMAIL, passwordHash],
       );
       logger.info({ email: SEED_EMAIL }, 'Seed: admin criado');
-      return;
-    }
-
-    // User exists in correct org — verify/fix hash, role, lock, and active state
-    const row = existing.rows[0];
-    const valid = await bcrypt.compare(SEED_PASSWORD, row.password_hash);
-    if (!valid) {
-      const passwordHash = await bcrypt.hash(SEED_PASSWORD, BCRYPT_ROUNDS);
+    } else {
+      // Sempre atualiza hash + limpa bloqueios + garante super_admin
       await db.query(
         `UPDATE users
          SET password_hash = $1, failed_login_attempts = 0, locked_until = NULL,
              role = 'super_admin', otp_secret = NULL, otp_enabled = FALSE, is_active = TRUE
          WHERE id = $2`,
-        [passwordHash, row.id],
+        [passwordHash, existing.rows[0].id],
       );
-      logger.info({ email: SEED_EMAIL }, 'Seed: hash do admin corrigido');
-    } else {
-      await db.query(
-        `UPDATE users
-         SET failed_login_attempts = 0, locked_until = NULL, role = 'super_admin', is_active = TRUE
-         WHERE id = $1`,
-        [row.id],
-      );
-      logger.info({ email: SEED_EMAIL }, 'Seed: admin OK');
+      logger.info({ email: SEED_EMAIL }, 'Seed: admin atualizado (hash + bloqueios resetados)');
     }
+
+    await _clearRateLimit(SEED_EMAIL);
   } catch (err) {
     logger.error({ err }, 'Seed: falha ao criar admin (servidor continua)');
   }
@@ -102,7 +103,6 @@ async function seedAdminUser() {
 
 module.exports = { seedAdminUser };
 
-// Allow running directly: node scripts/seed.js
 if (require.main === module) {
   db.connect()
     .then(() => seedAdminUser())
