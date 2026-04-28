@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Shield } from 'lucide-react'
+import { Logo } from '@/components/Logo'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 export function AuthLayout() {
   return (
@@ -20,18 +21,24 @@ export function AuthLayout() {
         }}
       />
 
-      {/* Logo */}
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 flex items-center gap-3 p-8"
+        className="relative z-10 flex items-center justify-between p-6 sm:p-8"
       >
-        <div className="w-9 h-9 bg-brand-gradient rounded-xl flex items-center justify-center shadow-brand">
-          <Shield className="w-5 h-5 text-white" />
+        {/* Logo */}
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-brand-gradient rounded-xl flex items-center justify-center shadow-brand">
+            <Logo className="w-5 h-5" white />
+          </div>
+          <span className="font-bold text-xl text-txt-primary tracking-tight">
+            Sync2B <span className="text-gradient-brand">Safeguard</span>
+          </span>
         </div>
-        <span className="font-bold text-xl text-txt-primary tracking-tight">
-          Sync2B <span className="text-gradient-brand">Safeguard</span>
-        </span>
+
+        {/* Theme toggle */}
+        <ThemeToggle />
       </motion.div>
 
       {/* Content */}

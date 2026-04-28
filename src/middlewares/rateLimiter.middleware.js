@@ -13,7 +13,12 @@ function _store(prefix) {
   if (process.env.NODE_ENV === 'test') return undefined;
   try {
     return new RedisStore({
-      sendCommand: (...args) => redis.call(...args),
+      sendCommand: async (...args) => {
+        const [command, ...cmdArgs] = args;
+        const fn = redis[command.toLowerCase()];
+        if (typeof fn !== 'function') return 0;
+        return fn.apply(redis, cmdArgs);
+      },
       prefix: `rl:${prefix}:`,
     });
   } catch {

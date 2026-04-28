@@ -4,8 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { useAuthStore } from '@/store/auth.store'
 import { authService } from '@/services/auth.service'
+import { useTheme } from '@/hooks/useTheme'
 
 export function AppLayout() {
+  useTheme()
   const location = useLocation()
   const navigate = useNavigate()
   const { user, setUser, logout } = useAuthStore()
