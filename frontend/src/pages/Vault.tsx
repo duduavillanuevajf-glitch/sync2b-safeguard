@@ -73,7 +73,7 @@ export function Vault() {
     const blob = await vaultService.exportCsv()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `vault-${Date.now()}.csv`; a.click()
+    a.href = url; a.download = `credenciais-${Date.now()}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -84,8 +84,8 @@ export function Vault() {
     <div className="space-y-6">
       <PageHeader
         icon={KeyRound}
-        title="Cofre de Credenciais"
-        description={`${meta.total} credenciais no cofre`}
+        title="Credenciais"
+        description={`${meta.total} credenciais`}
         actions={
           <div className="flex items-center gap-2">
             {hasPermission('vault:export') && (

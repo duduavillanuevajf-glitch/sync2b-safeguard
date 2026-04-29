@@ -43,6 +43,7 @@ export interface VaultItem {
   notes?: string
   tags: string[]
   category?: string
+  teamId?: string
   expiresAt?: string
   isArchived: boolean
   archivedAt?: string

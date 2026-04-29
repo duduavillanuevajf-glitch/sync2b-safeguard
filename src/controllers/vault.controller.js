@@ -25,6 +25,7 @@ async function listItems(req, res, next) {
   try {
     const { items, total, page, limit } = await vaultService.listItems({
       organizationId: req.user.organizationId,
+      userId: req.user.id,
       query: req.query,
     });
     paginated(res, items, { total, page, limit });

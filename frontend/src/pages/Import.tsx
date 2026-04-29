@@ -47,7 +47,7 @@ export function Import() {
     const blob = await vaultService.downloadTemplate()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = 'vault-template.csv'; a.click()
+    a.href = url; a.download = 'modelo-credenciais.csv'; a.click()
     URL.revokeObjectURL(url)
   }
 

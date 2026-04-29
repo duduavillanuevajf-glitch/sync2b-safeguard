@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, KeyRound, ScrollText, Users,
   Upload, Bell, Settings, User, ChevronLeft, ChevronRight,
-  LogOut, Building2, ShieldCheck,
+  LogOut, Building2, ShieldCheck, UsersRound,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import { useAuthStore } from '@/store/auth.store'
@@ -11,15 +11,17 @@ import { useUIStore } from '@/store/ui.store'
 import { authService } from '@/services/auth.service'
 
 const NAV = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard',  section: 'main' },
-  { to: '/vault',     icon: KeyRound,        label: 'Cofre',       section: 'main' },
-  { to: '/alerts',    icon: Bell,            label: 'Alertas',     section: 'main', badge: 'warn' },
-  { to: '/import',    icon: Upload,          label: 'Importação',  section: 'main' },
-  { to: '/audit',       icon: ScrollText,   label: 'Auditoria',   section: 'manage' },
-  { to: '/users',       icon: Users,        label: 'Usuários',    section: 'manage' },
-  { to: '/permissions', icon: ShieldCheck,  label: 'Permissões',  section: 'manage' },
-  { to: '/settings',  icon: Settings,        label: 'Configurações',section:'system' },
-  { to: '/profile',   icon: User,            label: 'Perfil',      section: 'system' },
+  { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard',      section: 'main' },
+  { to: '/credenciais',    icon: KeyRound,        label: 'Credenciais',    section: 'main' },
+  { to: '/alerts',         icon: Bell,            label: 'Alertas',        section: 'main', badge: 'warn' },
+  { to: '/import',         icon: Upload,          label: 'Importação',     section: 'main' },
+  { to: '/audit',          icon: ScrollText,      label: 'Auditoria',      section: 'manage' },
+  { to: '/users',          icon: Users,           label: 'Usuários',       section: 'manage' },
+  { to: '/equipes',        icon: UsersRound,      label: 'Equipes',        section: 'manage' },
+  { to: '/organizacoes',   icon: Building2,       label: 'Organizações',   section: 'manage' },
+  { to: '/permissions',    icon: ShieldCheck,     label: 'Permissões',     section: 'manage' },
+  { to: '/settings',       icon: Settings,        label: 'Configurações',  section: 'system' },
+  { to: '/profile',        icon: User,            label: 'Perfil',         section: 'system' },
 ]
 
 const SECTIONS: Record<string, string> = {

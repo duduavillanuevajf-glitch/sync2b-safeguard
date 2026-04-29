@@ -54,12 +54,16 @@ export function Dashboard() {
   const activityData = generateMockActivity()
 
   const actionMap: Record<string, { label: string; icon: string }> = {
-    'vault:read':   { label: 'Leitura',   icon: '👁' },
-    'vault:create': { label: 'Criação',   icon: '✚' },
-    'vault:update': { label: 'Edição',    icon: '✏' },
-    'vault:delete': { label: 'Exclusão',  icon: '🗑' },
-    'auth:login':   { label: 'Login',     icon: '🔑' },
-    'auth:logout':  { label: 'Logout',    icon: '🚪' },
+    'CREDENTIAL_CREATED':  { label: 'Credencial criada',    icon: '🔑' },
+    'CREDENTIAL_UPDATED':  { label: 'Credencial atualizada',icon: '✏️' },
+    'VAULT_ITEM_DELETED':  { label: 'Credencial excluída',  icon: '🗑️' },
+    'VAULT_ITEM_ARCHIVED': { label: 'Credencial arquivada', icon: '📦' },
+    'VAULT_EXPORTED':      { label: 'Exportação',           icon: '📤' },
+    'LOGIN_SUCCESS':       { label: 'Login',                icon: '🔓' },
+    'LOGIN_FAILED':        { label: 'Login falhou',         icon: '⚠️' },
+    'LOGOUT':              { label: 'Logout',               icon: '🚪' },
+    'USER_CREATED':        { label: 'Usuário criado',       icon: '👤' },
+    'TEAM_CREATED':        { label: 'Equipe criada',        icon: '👥' },
   }
 
   return (

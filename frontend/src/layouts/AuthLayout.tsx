@@ -55,7 +55,7 @@ export function AuthLayout() {
         transition={{ delay: 0.5 }}
         className="relative z-10 text-center p-6 text-txt-muted text-xs"
       >
-        © {new Date().getFullYear()} Sync2B Safeguard · Enterprise Password Vault ·{' '}
+        © {new Date().getFullYear()} Sync2B Safeguard · Gestão de Credenciais ·{' '}
         <span className="text-brand/70">SOC 2 Ready</span>
       </motion.div>
     </div>

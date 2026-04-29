@@ -1,7 +1,7 @@
 {
   "name": "Sync2B Safeguard",
   "short_name": "Safeguard",
-  "description": "Enterprise Password Vault",
+  "description": "Gestão de Credenciais Corporativas",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#060a12",

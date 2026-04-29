@@ -10,6 +10,8 @@ import { Vault } from '@/pages/Vault'
 import { VaultDetail } from '@/pages/VaultDetail'
 import { Audit } from '@/pages/Audit'
 import { Users } from '@/pages/Users'
+import { Teams } from '@/pages/Teams'
+import { Organizations } from '@/pages/Organizations'
 import { Permissions } from '@/pages/Permissions'
 import { Import } from '@/pages/Import'
 import { Alerts } from '@/pages/Alerts'
@@ -32,10 +34,12 @@ export const router = createBrowserRouter([
     children: [
       { path: 'dashboard', element: <Dashboard /> },
       { path: 'setup-2fa', element: <Setup2FA /> },
-      { path: 'vault', element: <Vault /> },
-      { path: 'vault/:id', element: <VaultDetail /> },
+      { path: 'credenciais', element: <Vault /> },
+      { path: 'credenciais/:id', element: <VaultDetail /> },
       { path: 'audit', element: <Audit /> },
       { path: 'users', element: <Users /> },
+      { path: 'equipes', element: <Teams /> },
+      { path: 'organizacoes', element: <Organizations /> },
       { path: 'permissions', element: <Permissions /> },
       { path: 'import', element: <Import /> },
       { path: 'alerts', element: <Alerts /> },

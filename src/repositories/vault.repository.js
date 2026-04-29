@@ -14,29 +14,41 @@ class VaultRepository extends BaseRepository {
     const {
       organizationId, createdBy, name, host, dns, port, service, username,
       encryptedPassword, encryptionIv, encryptionTag, encryptionVersion,
-      notes, tags, category, expiresAt,
+      notes, tags, category, teamId, expiresAt,
     } = data;
     const { rows } = await client.query(
       `INSERT INTO vault_items
          (id, organization_id, created_by, name, host, dns, port, service, username,
           encrypted_password, encryption_iv, encryption_tag, encryption_version,
-          notes, tags, category, expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+          notes, tags, category, team_id, expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING *`,
       [
         uuid(), organizationId, createdBy, name, host || null, dns || null,
         port || null, service || null, username || null,
         encryptedPassword, encryptionIv, encryptionTag, encryptionVersion || '1',
-        notes || null, tags || [], category || null, expiresAt || null,
+        notes || null, tags || [], category || null, teamId || null, expiresAt || null,
       ]
     );
     return rows[0];
   }
 
-  async list(organizationId, { isArchived = false, limit, offset, search, service, category }, trx) {
+  async list(organizationId, { isArchived = false, limit, offset, search, service, category, userId }, trx) {
     const client = trx || db;
-    const params = [organizationId, isArchived];
+    // $1=organizationId, $2=isArchived, $3=userId (visibility rule)
+    const params = [organizationId, isArchived, userId];
     const extra = [];
+
+    // Visibility: personal items only visible to creator; shared with team only to members
+    extra.push(`(
+      v.category IS NULL
+      OR v.category NOT IN ('pessoal','compartilhada')
+      OR (v.category = 'pessoal' AND v.created_by = $3)
+      OR (v.category = 'compartilhada' AND (
+        v.team_id IS NULL
+        OR EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = v.team_id AND tm.user_id = $3)
+      ))
+    )`);
 
     if (search) {
       params.push(`%${search}%`);
@@ -52,14 +64,14 @@ class VaultRepository extends BaseRepository {
       extra.push(`v.category ILIKE $${params.length}`);
     }
 
-    const where = extra.length ? 'AND ' + extra.join(' AND ') : '';
+    const where = 'AND ' + extra.join(' AND ');
     params.push(limit, offset);
     const li = params.length - 1;
     const oi = params.length;
 
     const { rows } = await client.query(
       `SELECT v.id, v.name, v.host, v.dns, v.port, v.service, v.username,
-              v.notes, v.tags, v.category, v.created_at, v.updated_at,
+              v.notes, v.tags, v.category, v.team_id, v.created_at, v.updated_at,
               v.is_archived, v.archived_at, v.expires_at, v.last_accessed_at,
               u.email AS created_by_email,
               EXTRACT(DAY FROM NOW() - v.updated_at)::INTEGER AS days_since_update
@@ -75,29 +87,39 @@ class VaultRepository extends BaseRepository {
     return rows;
   }
 
-  async countList(organizationId, { isArchived = false, search, service, category }, trx) {
+  async countList(organizationId, { isArchived = false, search, service, category, userId }, trx) {
     const client = trx || db;
-    const params = [organizationId, isArchived];
+    const params = [organizationId, isArchived, userId];
     const extra = [];
+
+    extra.push(`(
+      v.category IS NULL
+      OR v.category NOT IN ('pessoal','compartilhada')
+      OR (v.category = 'pessoal' AND v.created_by = $3)
+      OR (v.category = 'compartilhada' AND (
+        v.team_id IS NULL
+        OR EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = v.team_id AND tm.user_id = $3)
+      ))
+    )`);
 
     if (search) {
       params.push(`%${search}%`);
       const i = params.length;
-      extra.push(`(name ILIKE $${i} OR host ILIKE $${i} OR username ILIKE $${i})`);
+      extra.push(`(v.name ILIKE $${i} OR v.host ILIKE $${i} OR v.username ILIKE $${i})`);
     }
     if (service) {
       params.push(service);
-      extra.push(`service = $${params.length}`);
+      extra.push(`v.service = $${params.length}`);
     }
     if (category) {
       params.push(category);
-      extra.push(`category ILIKE $${params.length}`);
+      extra.push(`v.category ILIKE $${params.length}`);
     }
 
-    const where = extra.length ? 'AND ' + extra.join(' AND ') : '';
+    const where = 'AND ' + extra.join(' AND ');
     const { rows } = await client.query(
-      `SELECT COUNT(*) AS count FROM vault_items
-       WHERE organization_id = $1 AND is_archived = $2 ${where}`,
+      `SELECT COUNT(*) AS count FROM vault_items v
+       WHERE v.organization_id = $1 AND v.is_archived = $2 ${where}`,
       params
     );
     return parseInt(rows[0].count, 10);
@@ -120,7 +142,7 @@ class VaultRepository extends BaseRepository {
     const allowed = [
       'name', 'host', 'dns', 'port', 'service', 'username',
       'encrypted_password', 'encryption_iv', 'encryption_tag',
-      'notes', 'tags', 'category', 'expires_at',
+      'notes', 'tags', 'category', 'team_id', 'expires_at',
     ];
     const keys = Object.keys(data).filter(k => allowed.includes(k));
     if (!keys.length) return null;

@@ -8,17 +8,32 @@ import { fDateTime } from '@/utils/format'
 import { cn } from '@/utils/cn'
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  'vault:read':       { label: 'Leitura',        color: 'text-brand bg-brand/10' },
-  'vault:create':     { label: 'Criação',         color: 'text-blue-400 bg-blue-400/10' },
-  'vault:update':     { label: 'Atualização',     color: 'text-yellow-400 bg-yellow-400/10' },
-  'vault:delete':     { label: 'Exclusão',        color: 'text-danger bg-danger/10' },
-  'vault:export':     { label: 'Exportação',      color: 'text-purple-400 bg-purple-400/10' },
-  'vault:import':     { label: 'Importação',      color: 'text-orange-400 bg-orange-400/10' },
-  'auth:login':       { label: 'Login',           color: 'text-success bg-success/10' },
-  'auth:logout':      { label: 'Logout',          color: 'text-slate-400 bg-slate-400/10' },
-  'auth:failed_login':{ label: 'Login falhou',    color: 'text-danger bg-danger/10' },
-  'users:create':     { label: 'Usuário criado',  color: 'text-blue-400 bg-blue-400/10' },
-  'users:delete':     { label: 'Usuário removido',color: 'text-danger bg-danger/10' },
+  'CREDENTIAL_CREATED':        { label: 'Credencial criada',       color: 'text-blue-400 bg-blue-400/10' },
+  'CREDENTIAL_UPDATED':        { label: 'Credencial atualizada',   color: 'text-yellow-400 bg-yellow-400/10' },
+  'VAULT_ITEM_DELETED':        { label: 'Credencial excluída',     color: 'text-danger bg-danger/10' },
+  'VAULT_ITEM_ARCHIVED':       { label: 'Credencial arquivada',    color: 'text-slate-400 bg-slate-400/10' },
+  'VAULT_ITEM_UNARCHIVED':     { label: 'Credencial reativada',    color: 'text-brand bg-brand/10' },
+  'VAULT_EXPORTED':            { label: 'Exportação',              color: 'text-purple-400 bg-purple-400/10' },
+  'VAULT_IMPORTED':            { label: 'Importação',              color: 'text-orange-400 bg-orange-400/10' },
+  'LOGIN_SUCCESS':             { label: 'Login',                   color: 'text-success bg-success/10' },
+  'LOGOUT':                    { label: 'Logout',                  color: 'text-slate-400 bg-slate-400/10' },
+  'LOGIN_FAILED':              { label: 'Login falhou',            color: 'text-danger bg-danger/10' },
+  'LOGIN_2FA_FAILED':          { label: 'Autenticação 2FA falhou', color: 'text-danger bg-danger/10' },
+  'USER_REGISTERED':           { label: 'Registro',                color: 'text-blue-400 bg-blue-400/10' },
+  'USER_CREATED':              { label: 'Usuário criado',          color: 'text-blue-400 bg-blue-400/10' },
+  'USER_UPDATED':              { label: 'Usuário atualizado',      color: 'text-yellow-400 bg-yellow-400/10' },
+  'USER_DEACTIVATED':          { label: 'Usuário desativado',      color: 'text-danger bg-danger/10' },
+  'PASSWORD_RESET_REQUESTED':  { label: 'Reset de senha solicitado', color: 'text-warn bg-warn/10' },
+  'PASSWORD_RESET_COMPLETED':  { label: 'Senha redefinida',        color: 'text-brand bg-brand/10' },
+  'PASSWORD_CHANGED':          { label: 'Senha alterada',          color: 'text-brand bg-brand/10' },
+  'ORGANIZATION_UPDATED':      { label: 'Organização atualizada',  color: 'text-yellow-400 bg-yellow-400/10' },
+  'ORGANIZATION_CREATED':      { label: 'Organização criada',      color: 'text-blue-400 bg-blue-400/10' },
+  'ORGANIZATION_TOGGLED':      { label: 'Organização ativada/desativada', color: 'text-slate-400 bg-slate-400/10' },
+  'TEAM_CREATED':              { label: 'Equipe criada',           color: 'text-blue-400 bg-blue-400/10' },
+  'TEAM_UPDATED':              { label: 'Equipe atualizada',       color: 'text-yellow-400 bg-yellow-400/10' },
+  'TEAM_DELETED':              { label: 'Equipe excluída',         color: 'text-danger bg-danger/10' },
+  'TEAM_MEMBER_ADDED':         { label: 'Membro adicionado',       color: 'text-brand bg-brand/10' },
+  'TEAM_MEMBER_REMOVED':       { label: 'Membro removido',         color: 'text-slate-400 bg-slate-400/10' },
 }
 
 export function Audit() {
@@ -37,7 +52,7 @@ export function Audit() {
   })
 
   const logs = data?.logs ?? []
-  const meta = data?.meta ?? { total: 0, pages: 1 }
+  const meta = data?.meta ?? { total: 0, pages: 1, page: 1 }
 
   const handleExport = () => {
     const csv = ['Timestamp,Ação,Usuário,IP,Recurso',

@@ -53,4 +53,9 @@ router.get('/audit',
   controller.getAuditLogs
 );
 
+// Organizations (visible a org_admin/super_admin — scopo já garantido pelo requireRole acima)
+router.get('/organizations', controller.listOrganizations);
+router.post('/organizations', requireRole(ROLES.SUPER_ADMIN), controller.createOrganization);
+router.patch('/organizations/:id/toggle', requireRole(ROLES.SUPER_ADMIN), controller.toggleOrganization);
+
 module.exports = router;

@@ -65,25 +65,21 @@ async function createItem({ organizationId, userId, data, ipAddress }) {
       notes: data.notes,
       tags: data.tags,
       category: data.category,
+      teamId: data.teamId,
       expiresAt: data.expiresAt,
     }, trx);
 
     await auditRepo.logVaultHistory({
-      vaultItemId: item.id,
-      organizationId,
-      userId,
-      action: 'CREATED',
-      ipAddress,
+      vaultItemId: item.id, organizationId, userId, action: 'CREATED', ipAddress,
     }, trx);
 
     await auditRepo.log({
-      organizationId,
-      userId,
-      action: 'VAULT_ITEM_CREATED',
-      resourceType: 'vault_item',
+      organizationId, userId,
+      action: 'CREDENTIAL_CREATED',
+      resourceType: 'credential',
       resourceId: item.id,
       ipAddress,
-      metadata: { name: item.name, service: item.service },
+      metadata: { name: item.name, service: item.service, category: item.category },
     });
 
     return item;
@@ -92,7 +88,7 @@ async function createItem({ organizationId, userId, data, ipAddress }) {
 
 // ── List ──────────────────────────────────────────────────────────────────────
 
-async function listItems({ organizationId, query }) {
+async function listItems({ organizationId, userId, query }) {
   const { page, limit, offset } = parsePagination(query);
   const isArchived = query.archived === 'true';
   const search = query.search || null;
@@ -100,8 +96,8 @@ async function listItems({ organizationId, query }) {
   const category = query.category || null;
 
   const [rows, total] = await Promise.all([
-    vaultRepo.list(organizationId, { isArchived, limit, offset, search, service, category }),
-    vaultRepo.countList(organizationId, { isArchived, search, service, category }),
+    vaultRepo.list(organizationId, { isArchived, limit, offset, search, service, category, userId }),
+    vaultRepo.countList(organizationId, { isArchived, search, service, category, userId }),
   ]);
 
   const org = await orgRepo.findById(organizationId);
@@ -150,6 +146,7 @@ async function getItem({ id, organizationId, userId, ipAddress }) {
     notes: item.notes,
     tags: item.tags,
     category: item.category,
+    teamId: item.team_id,
     expiresAt: item.expires_at,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
@@ -218,8 +215,8 @@ async function updateItem({ id, organizationId, userId, data, ipAddress }) {
     await auditRepo.log({
       organizationId,
       userId,
-      action: 'VAULT_ITEM_UPDATED',
-      resourceType: 'vault_item',
+      action: 'CREDENTIAL_UPDATED',
+      resourceType: 'credential',
       resourceId: id,
       ipAddress,
       metadata: { fields: changes.map(c => c.field) },

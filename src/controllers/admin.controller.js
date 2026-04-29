@@ -205,8 +205,55 @@ async function getAuditLogs(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ── Organizations (super_admin only) ─────────────────────────────────────────
+
+async function listOrganizations(req, res, next) {
+  try {
+    const orgs = await orgRepo.listAll();
+    success(res, orgs);
+  } catch (err) { next(err); }
+}
+
+async function createOrganization(req, res, next) {
+  try {
+    const { name, slug, plan, maxUsers, maxVaultItems, alertDays } = req.body;
+    const existing = await orgRepo.findBySlug(slug);
+    if (existing) throw new ConflictError('Slug já utilizado');
+    const org = await orgRepo.create({ name, slug });
+    if (plan || maxUsers || maxVaultItems || alertDays) {
+      await orgRepo.update(org.id, {
+        plan: plan || undefined,
+        max_users: maxUsers || undefined,
+        max_vault_items: maxVaultItems || undefined,
+        alert_days: alertDays || undefined,
+      });
+    }
+    await auditRepo.log({
+      organizationId: org.id, userId: req.user.id,
+      action: 'ORGANIZATION_CREATED', resourceType: 'organization', resourceId: org.id,
+      ipAddress: _ip(req), metadata: { name, slug },
+    });
+    created(res, org, 'Organização criada com sucesso');
+  } catch (err) { next(err); }
+}
+
+async function toggleOrganization(req, res, next) {
+  try {
+    const org = await orgRepo.findById(req.params.id);
+    if (!org) throw new NotFoundError('Organização');
+    const updated = await orgRepo.update(req.params.id, { is_active: !org.is_active });
+    await auditRepo.log({
+      organizationId: req.params.id, userId: req.user.id,
+      action: 'ORGANIZATION_TOGGLED', resourceType: 'organization', resourceId: req.params.id,
+      ipAddress: _ip(req), metadata: { is_active: updated.is_active },
+    });
+    success(res, updated, { message: updated.is_active ? 'Organização ativada' : 'Organização desativada' });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   getOrganization, updateOrganization,
+  listOrganizations, createOrganization, toggleOrganization,
   listUsers, createUser, getUser, updateUser, deleteUser,
   getAuditLogs,
 };

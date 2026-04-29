@@ -38,7 +38,7 @@ export function VaultDetail() {
 
   const deleteMut = useMutation({
     mutationFn: () => vaultService.delete(id!),
-    onSuccess: () => navigate('/vault'),
+    onSuccess: () => navigate('/credenciais'),
   })
 
   if (isLoading) return (
@@ -55,9 +55,9 @@ export function VaultDetail() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Back */}
-      <button onClick={() => navigate('/vault')} className="flex items-center gap-1.5 text-sm text-txt-muted hover:text-txt-primary transition-colors">
+      <button onClick={() => navigate('/credenciais')} className="flex items-center gap-1.5 text-sm text-txt-muted hover:text-txt-primary transition-colors">
         <ArrowLeft className="w-4 h-4" />
-        Voltar ao cofre
+        Voltar às credenciais
       </button>
 
       {/* Header card */}
