@@ -10,10 +10,22 @@ function _ip(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
 }
 
+function _normalizeTeam(t) {
+  return {
+    id:          t.id,
+    name:        t.name,
+    description: t.description || null,
+    isActive:    t.is_active   ?? true,
+    memberCount: t.member_count ?? 0,
+    createdAt:   t.created_at,
+    updatedAt:   t.updated_at,
+  };
+}
+
 async function listTeams(req, res, next) {
   try {
     const teams = await teamsRepo.list(req.user.organizationId);
-    success(res, teams);
+    success(res, teams.map(_normalizeTeam));
   } catch (err) { next(err); }
 }
 
@@ -28,7 +40,7 @@ async function createTeam(req, res, next) {
       action: 'TEAM_CREATED', resourceType: 'team', resourceId: team.id,
       ipAddress: _ip(req), metadata: { name },
     });
-    created(res, team, 'Equipe criada com sucesso');
+    created(res, _normalizeTeam(team), 'Equipe criada com sucesso');
   } catch (err) {
     if (err.code === '23505') return next(new ConflictError('Já existe uma equipe com esse nome'));
     next(err);
@@ -39,7 +51,7 @@ async function getTeam(req, res, next) {
   try {
     const team = await teamsRepo.findById(req.params.id, req.user.organizationId);
     if (!team) throw new NotFoundError('Equipe');
-    success(res, team);
+    success(res, _normalizeTeam(team));
   } catch (err) { next(err); }
 }
 
@@ -59,7 +71,7 @@ async function updateTeam(req, res, next) {
       action: 'TEAM_UPDATED', resourceType: 'team', resourceId: req.params.id,
       ipAddress: _ip(req), metadata: { fields: Object.keys(req.body) },
     });
-    success(res, team, { message: 'Equipe atualizada' });
+    success(res, _normalizeTeam(team), { message: 'Equipe atualizada' });
   } catch (err) {
     if (err.code === '23505') return next(new ConflictError('Já existe uma equipe com esse nome'));
     next(err);
@@ -104,8 +116,14 @@ async function addMember(req, res, next) {
     if (!user || user.organization_id !== req.user.organizationId) {
       throw new NotFoundError('Usuário');
     }
+    if (!user.is_active) {
+      throw new ForbiddenError('Usuário inativo não pode ser adicionado a equipes');
+    }
     const team = await teamsRepo.findById(req.params.id, req.user.organizationId);
     if (!team) throw new NotFoundError('Equipe');
+    if (!team.is_active) {
+      throw new ForbiddenError('Não é possível adicionar membros a uma equipe inativa');
+    }
 
     await teamsRepo.addMember(req.params.id, userId);
     await auditRepo.log({

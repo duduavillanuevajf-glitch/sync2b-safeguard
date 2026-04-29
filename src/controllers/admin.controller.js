@@ -18,6 +18,20 @@ function _ip(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
 }
 
+function _normalizeUser(r) {
+  return {
+    id:          r.id,
+    email:       r.email,
+    role:        r.role,
+    firstName:   r.first_name  || null,
+    lastName:    r.last_name   || null,
+    isActive:    r.is_active   ?? true,
+    lastLoginAt: r.last_login_at || null,
+    createdAt:   r.created_at,
+    updatedAt:   r.updated_at  || null,
+  };
+}
+
 // ── Organization ──────────────────────────────────────────────────────────────
 
 async function getOrganization(req, res, next) {
@@ -61,7 +75,7 @@ async function listUsers(req, res, next) {
       userRepo.listByOrganization(req.user.organizationId, { limit, offset }),
       userRepo.countByOrganization(req.user.organizationId),
     ]);
-    paginated(res, rows, { total, page, limit });
+    paginated(res, rows.map(_normalizeUser), { total, page, limit });
   } catch (err) { next(err); }
 }
 
@@ -154,7 +168,7 @@ async function updateUser(req, res, next) {
       metadata: { fields: Object.keys(req.body) },
     });
 
-    success(res, updated, { message: 'Usuário atualizado' });
+    success(res, _normalizeUser(updated), { message: 'Usuário atualizado' });
   } catch (err) { next(err); }
 }
 

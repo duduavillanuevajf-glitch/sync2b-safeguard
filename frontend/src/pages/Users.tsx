@@ -87,7 +87,7 @@ function UserModal({ user, onClose, onSave }: { user?: User | null; onClose: () 
           )}
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-txt-secondary uppercase tracking-wide">Função</label>
+            <label className="text-xs font-semibold text-txt-secondary uppercase tracking-wide">Perfil</label>
             <select {...(user ? (editForm.register as any) : createForm.register)('role')} className="input-field appearance-none">
               <option value="vault_viewer">Visualizador</option>
               <option value="vault_manager">Gestor</option>
@@ -180,9 +180,9 @@ export function Users() {
           <thead>
             <tr className="border-b border-border">
               <th className="px-4 py-3 text-left text-xs font-semibold text-txt-muted uppercase tracking-wide">Usuário</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-txt-muted uppercase tracking-wide">Função</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-txt-muted uppercase tracking-wide">Perfil</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-txt-muted uppercase tracking-wide hidden md:table-cell">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-txt-muted uppercase tracking-wide hidden lg:table-cell">Criado em</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-txt-muted uppercase tracking-wide hidden lg:table-cell">Data de Criação</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
