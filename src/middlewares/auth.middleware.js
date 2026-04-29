@@ -22,11 +22,23 @@ async function authenticate(req, res, next) {
     if (!user.is_active) throw new AuthenticationError('Conta desativada');
     if (!user.org_active) throw new AuthenticationError('Organização inativa');
 
+    // Usa a org do JWT (permite multi-org); fallback para a org primária do usuário
+    const effectiveOrgId = decoded.org || user.organization_id;
+    let effectiveRole = decoded.role || user.role;
+
+    // Se org selecionada difere da primária, busca papel correto na junction table
+    if (effectiveOrgId !== user.organization_id) {
+      try {
+        const membership = await userRepo.findMembership(user.id, effectiveOrgId);
+        if (membership && membership.is_active) effectiveRole = membership.role;
+      } catch (_) { /* tabela ainda não criada — usa role do JWT */ }
+    }
+
     req.user = {
       id: user.id,
       email: user.email,
-      role: user.role,
-      organizationId: user.organization_id,
+      role: effectiveRole,
+      organizationId: effectiveOrgId,
       orgName: user.org_name,
       orgAlertDays: user.org_alert_days,
     };

@@ -8,6 +8,7 @@ const userRepo = require('../repositories/user.repository');
 const orgRepo = require('../repositories/organization.repository');
 const tokenRepo = require('../repositories/token.repository');
 const auditRepo = require('../repositories/audit.repository');
+const db = require('../config/database');
 const { success, created, paginated, noContent } = require('../utils/response');
 const { NotFoundError, ForbiddenError, ConflictError } = require('../utils/errors');
 const { parsePagination } = require('../utils/pagination');
@@ -26,6 +27,7 @@ function _normalizeUser(r) {
     firstName:   r.first_name  || null,
     lastName:    r.last_name   || null,
     isActive:    r.is_active   ?? true,
+    totpEnabled: r.otp_enabled ?? false,
     lastLoginAt: r.last_login_at || null,
     createdAt:   r.created_at,
     updatedAt:   r.updated_at  || null,
@@ -81,7 +83,7 @@ async function listUsers(req, res, next) {
 
 async function createUser(req, res, next) {
   try {
-    const { email, password, role, firstName, lastName } = req.body;
+    const { email, password, role, firstName, lastName, require2fa = true } = req.body;
     const org = await orgRepo.findById(req.user.organizationId);
     const userCount = await userRepo.countByOrganization(req.user.organizationId);
     if (userCount >= org.max_users) {
@@ -92,19 +94,33 @@ async function createUser(req, res, next) {
     if (existing) throw new ConflictError('Email já cadastrado nesta organização');
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const otpSecret = speakeasy.generateSecret({ name: `Sync2B Safeguard (${email})` });
+
+    let otpSecretBase32 = null;
+    let qrCode = null;
+    if (require2fa !== false) {
+      const otpSecret = speakeasy.generateSecret({ name: `Sync2B Safeguard (${email})` });
+      otpSecretBase32 = otpSecret.base32;
+      qrCode = await qrcode.toDataURL(otpSecret.otpauth_url);
+    }
 
     const user = await userRepo.create({
       organizationId: req.user.organizationId,
       email,
       passwordHash,
-      otpSecret: otpSecret.base32,
+      otpSecret: otpSecretBase32,
       role,
       firstName,
       lastName,
     });
 
-    const qrCode = await qrcode.toDataURL(otpSecret.otpauth_url);
+    // Popula junction table para suporte multi-org
+    try {
+      await db.query(
+        `INSERT INTO user_organizations (user_id, organization_id, role)
+         VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+        [user.id, req.user.organizationId, role]
+      );
+    } catch (_) { /* migration 004 pode não ter sido executada ainda */ }
 
     await auditRepo.log({
       organizationId: req.user.organizationId,
@@ -113,13 +129,19 @@ async function createUser(req, res, next) {
       resourceType: 'user',
       resourceId: user.id,
       ipAddress: _ip(req),
-      metadata: { email, role },
+      metadata: { email, role, require2fa: require2fa !== false },
     });
 
-    created(res, {
-      user: { id: user.id, email: user.email, role: user.role },
-      setup: { qrCode, otpSecret: otpSecret.base32 },
-    }, 'Usuário criado. Compartilhe o QR Code com o usuário para configurar o Authenticator.');
+    const responseData = { user: { id: user.id, email: user.email, role: user.role } };
+    if (qrCode) {
+      responseData.setup = { qrCode, otpSecret: otpSecretBase32 };
+    }
+
+    const message = qrCode
+      ? 'Usuário criado. Compartilhe o QR Code com o usuário para configurar o Authenticator.'
+      : 'Usuário criado sem 2FA. O usuário poderá configurar 2FA no primeiro acesso.';
+
+    created(res, responseData, message);
   } catch (err) { next(err); }
 }
 
@@ -219,6 +241,95 @@ async function getAuditLogs(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ── 2FA Management ────────────────────────────────────────────────────────────
+
+async function reset2FA(req, res, next) {
+  try {
+    const user = await userRepo.findById(req.params.id);
+    if (!user || user.organization_id !== req.user.organizationId) throw new NotFoundError('Usuário');
+
+    const otpSecret = speakeasy.generateSecret({ name: `Sync2B Safeguard (${user.email})` });
+    await userRepo.resetOtpSecret(req.params.id, req.user.organizationId, otpSecret.base32);
+    await tokenRepo.revokeAllForUser(req.params.id);
+
+    const qrCode = await qrcode.toDataURL(otpSecret.otpauth_url);
+
+    await auditRepo.log({
+      organizationId: req.user.organizationId,
+      userId: req.user.id,
+      action: '2FA_RESET',
+      resourceType: 'user',
+      resourceId: req.params.id,
+      ipAddress: _ip(req),
+      metadata: { targetEmail: user.email },
+    });
+
+    success(res, { qrCode, otpSecret: otpSecret.base32 }, { message: '2FA resetado. Compartilhe o novo QR Code com o usuário.' });
+  } catch (err) { next(err); }
+}
+
+async function disable2FA(req, res, next) {
+  try {
+    const user = await userRepo.findById(req.params.id);
+    if (!user || user.organization_id !== req.user.organizationId) throw new NotFoundError('Usuário');
+    if (req.params.id === req.user.id) throw new ForbiddenError('Não é possível desativar seu próprio 2FA por aqui');
+
+    await userRepo.disableOtp(req.params.id, req.user.organizationId);
+    await tokenRepo.revokeAllForUser(req.params.id);
+
+    await auditRepo.log({
+      organizationId: req.user.organizationId,
+      userId: req.user.id,
+      action: '2FA_DISABLED',
+      resourceType: 'user',
+      resourceId: req.params.id,
+      ipAddress: _ip(req),
+      metadata: { targetEmail: user.email },
+    });
+
+    noContent(res);
+  } catch (err) { next(err); }
+}
+
+// ── Dashboard Stats ───────────────────────────────────────────────────────────
+
+async function getDashboardStats(req, res, next) {
+  try {
+    const orgId = req.user.organizationId;
+
+    // Atividade dos últimos 30 dias: leituras (ACCESSED/LOGIN_SUCCESS) e escritas (CREATED/UPDATED/DELETED)
+    const { rows: activityRows } = await db.query(
+      `SELECT
+         DATE(created_at AT TIME ZONE 'America/Sao_Paulo') AS day,
+         COUNT(*) FILTER (WHERE action IN ('CREDENTIAL_CREATED','CREDENTIAL_UPDATED','CREDENTIAL_DELETED','USER_CREATED','USER_UPDATED','TEAM_CREATED')) AS writes,
+         COUNT(*) FILTER (WHERE action IN ('LOGIN_SUCCESS','CREDENTIAL_ARCHIVED','CREDENTIAL_UNARCHIVED')) AS reads
+       FROM audit_logs
+       WHERE organization_id = $1
+         AND created_at >= NOW() - INTERVAL '30 days'
+       GROUP BY day
+       ORDER BY day`,
+      [orgId]
+    );
+
+    // Preenche os 30 dias (mesmo dias sem eventos)
+    const activity = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const found = activityRows.find(r => r.day.toISOString().slice(0, 10) === key);
+      activity.push({
+        date: label,
+        reads:  found ? parseInt(found.reads, 10)  : 0,
+        writes: found ? parseInt(found.writes, 10) : 0,
+      });
+    }
+
+    success(res, { activity });
+  } catch (err) { next(err); }
+}
+
 // ── Organizations (super_admin only) ─────────────────────────────────────────
 
 async function listOrganizations(req, res, next) {
@@ -270,4 +381,6 @@ module.exports = {
   listOrganizations, createOrganization, toggleOrganization,
   listUsers, createUser, getUser, updateUser, deleteUser,
   getAuditLogs,
+  reset2FA, disable2FA,
+  getDashboardStats,
 };

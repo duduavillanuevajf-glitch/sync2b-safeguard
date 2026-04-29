@@ -30,6 +30,7 @@ export interface User {
     slug: string
     alertDays: number
   }
+  updatedAt?: string
 }
 
 export interface VaultItem {

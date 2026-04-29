@@ -142,6 +142,20 @@ export const adminService = {
     return { logs: data.data as AuditLog[], meta: normalizeMeta(data.meta) }
   },
 
+  async reset2FA(userId: string) {
+    const { data } = await api.post(`/admin/users/${userId}/2fa/reset`)
+    return data.data as { qrCode: string; otpSecret: string }
+  },
+
+  async disable2FA(userId: string) {
+    await api.delete(`/admin/users/${userId}/2fa`)
+  },
+
+  async getDashboardStats() {
+    const { data } = await api.get('/admin/stats')
+    return data.data as { activity: Array<{ date: string; reads: number; writes: number }> }
+  },
+
   async listOrganizations() {
     const { data } = await api.get('/admin/organizations')
     return data.data as any[]

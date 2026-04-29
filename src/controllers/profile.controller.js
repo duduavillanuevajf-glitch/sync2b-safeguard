@@ -17,6 +17,8 @@ async function getProfile(req, res, next) {
       role: user.role,
       firstName: user.first_name,
       lastName: user.last_name,
+      isActive: user.is_active,
+      totpEnabled: user.otp_enabled ?? false,
       organization: {
         id: user.organization_id,
         name: user.org_name,

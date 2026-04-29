@@ -5,7 +5,20 @@ export const authService = {
   async login(email: string, password: string) {
     const { data } = await api.post('/auth/login', { email, password })
     return data.data as {
-      requiresTwoFactor: boolean
+      requiresTwoFactor?: boolean
+      requiresOrgSelection?: boolean
+      tempToken?: string
+      accessToken?: string
+      refreshToken?: string
+      expiresIn?: string
+      organizations?: Array<{ id: string; name: string; slug: string; role: string }>
+    }
+  },
+
+  async selectOrg(tempToken: string, organizationId: string) {
+    const { data } = await api.post('/auth/select-org', { tempToken, organizationId })
+    return data.data as {
+      requiresTwoFactor?: boolean
       tempToken?: string
       accessToken?: string
       refreshToken?: string

@@ -10,14 +10,21 @@ import { ServiceBadge } from '@/components/ui/Badge'
 import { vaultService, adminService } from '@/services/vault.service'
 import { fDateTime, fRelative } from '@/utils/format'
 import { useAuth } from '@/hooks/useAuth'
-import { subDays, format } from 'date-fns'
 
-function generateMockActivity() {
-  return Array.from({ length: 30 }, (_, i) => ({
-    date: format(subDays(new Date(), 29 - i), 'dd/MM'),
-    reads:  Math.floor(Math.random() * 80 + 20),
-    writes: Math.floor(Math.random() * 30 + 5),
-  }))
+const ACTION_MAP: Record<string, { label: string; icon: string }> = {
+  'CREDENTIAL_CREATED':   { label: 'Credencial criada',    icon: '🔑' },
+  'CREDENTIAL_UPDATED':   { label: 'Credencial atualizada',icon: '✏️' },
+  'CREDENTIAL_DELETED':   { label: 'Credencial excluída',  icon: '🗑️' },
+  'CREDENTIAL_ARCHIVED':  { label: 'Credencial arquivada', icon: '📦' },
+  'CREDENTIAL_EXPORTED':  { label: 'Exportação',           icon: '📤' },
+  'LOGIN_SUCCESS':        { label: 'Login',                icon: '🔓' },
+  'LOGIN_FAILED':         { label: 'Login falhou',         icon: '⚠️' },
+  'LOGOUT':               { label: 'Logout',               icon: '🚪' },
+  'USER_CREATED':         { label: 'Usuário criado',       icon: '👤' },
+  'TEAM_CREATED':         { label: 'Equipe criada',        icon: '👥' },
+  'TEAM_MEMBER_ADDED':    { label: 'Membro adicionado',    icon: '👥' },
+  '2FA_RESET':            { label: '2FA resetado',         icon: '🔐' },
+  '2FA_DISABLED':         { label: '2FA desativado',       icon: '🔓' },
 }
 
 export function Dashboard() {
@@ -46,32 +53,25 @@ export function Dashboard() {
     enabled: hasPermission('audit:read'),
   })
 
+  const { data: statsData, isLoading: loadingStats } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => adminService.getDashboardStats(),
+    enabled: hasPermission('audit:read'),
+  })
+
   const totalItems = vaultData?.meta?.total ?? 0
   const staleCount = alerts?.length ?? 0
   const totalUsers = usersData?.meta?.total ?? 0
   const score = totalItems === 0 ? 100 : Math.max(0, Math.round(100 - (staleCount / Math.max(totalItems, 1)) * 100))
 
-  const activityData = generateMockActivity()
-
-  const actionMap: Record<string, { label: string; icon: string }> = {
-    'CREDENTIAL_CREATED':  { label: 'Credencial criada',    icon: '🔑' },
-    'CREDENTIAL_UPDATED':  { label: 'Credencial atualizada',icon: '✏️' },
-    'VAULT_ITEM_DELETED':  { label: 'Credencial excluída',  icon: '🗑️' },
-    'VAULT_ITEM_ARCHIVED': { label: 'Credencial arquivada', icon: '📦' },
-    'VAULT_EXPORTED':      { label: 'Exportação',           icon: '📤' },
-    'LOGIN_SUCCESS':       { label: 'Login',                icon: '🔓' },
-    'LOGIN_FAILED':        { label: 'Login falhou',         icon: '⚠️' },
-    'LOGOUT':              { label: 'Logout',               icon: '🚪' },
-    'USER_CREATED':        { label: 'Usuário criado',       icon: '👤' },
-    'TEAM_CREATED':        { label: 'Equipe criada',        icon: '👥' },
-  }
+  const activityData = statsData?.activity ?? []
 
   return (
     <div className="space-y-6">
       <PageHeader
         icon={Activity}
         title="Dashboard"
-        description={`Bem-vindo, ${user?.firstName || 'usuário'}. Aqui está o resumo de segurança.`}
+        description={`Bem-vindo, ${user?.firstName || 'usuário'}${user?.organization?.name ? ` — ${user.organization.name}` : ''}. Resumo de segurança.`}
       />
 
       {/* Stats */}
@@ -104,7 +104,7 @@ export function Dashboard() {
           icon={Lock}
           label="Score de segurança"
           value={score}
-          delta="7 dias"
+          delta="30 dias"
           deltaPositive={score >= 70}
           color={score >= 70 ? 'brand' : score >= 50 ? 'warn' : 'danger'}
           delay={0.24}
@@ -114,7 +114,11 @@ export function Dashboard() {
       {/* Chart + Score */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3">
-          <ActivityChart data={activityData} />
+          {loadingStats ? (
+            <div className="h-64 shimmer-bg rounded-2xl" />
+          ) : (
+            <ActivityChart data={activityData} />
+          )}
         </div>
         <div className="lg:col-span-2">
           <SecurityScore
@@ -197,7 +201,7 @@ export function Dashboard() {
             ) : (
               <div className="divide-y divide-border">
                 {(auditData?.logs || []).slice(0, 7).map((log: any) => {
-                  const act = actionMap[log.action] || { label: log.action, icon: '•' }
+                  const act = ACTION_MAP[log.action] || { label: log.action, icon: '•' }
                   return (
                     <div key={log.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
                       <span className="text-base w-6 text-center">{act.icon}</span>

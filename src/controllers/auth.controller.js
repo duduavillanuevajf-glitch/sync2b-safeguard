@@ -29,6 +29,18 @@ async function login(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function selectOrganization(req, res, next) {
+  try {
+    const result = await authService.loginSelectOrg({
+      tempToken: req.body.tempToken,
+      organizationId: req.body.organizationId,
+      ipAddress: _ip(req),
+      userAgent: req.headers['user-agent'],
+    });
+    success(res, result, { message: result.requiresTwoFactor ? 'Insira o código 2FA.' : 'Autenticação completa.' });
+  } catch (err) { next(err); }
+}
+
 async function verifyTwoFactor(req, res, next) {
   try {
     const result = await authService.loginStep2({
@@ -107,7 +119,7 @@ async function confirmTwoFactor(req, res, next) {
 }
 
 module.exports = {
-  register, login, verifyTwoFactor, refreshToken, logout,
+  register, login, selectOrganization, verifyTwoFactor, refreshToken, logout,
   forgotPassword, validateResetToken, resetPassword,
   setupTwoFactor, confirmTwoFactor,
 };

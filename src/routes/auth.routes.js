@@ -19,6 +19,11 @@ router.post('/login',
   controller.login
 );
 
+router.post('/select-org',
+  rateLimiter.auth,
+  controller.selectOrganization
+);
+
 router.post('/2fa/verify',
   rateLimiter.auth,
   validate(schema.verifyTwoFactor),

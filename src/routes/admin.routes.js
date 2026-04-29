@@ -47,6 +47,23 @@ router.delete('/users/:id',
   controller.deleteUser
 );
 
+// 2FA management
+router.post('/users/:id/2fa/reset',
+  requirePermission(PERMISSIONS.USERS_UPDATE),
+  controller.reset2FA
+);
+
+router.delete('/users/:id/2fa',
+  requirePermission(PERMISSIONS.USERS_UPDATE),
+  controller.disable2FA
+);
+
+// Dashboard stats
+router.get('/stats',
+  requirePermission(PERMISSIONS.AUDIT_READ),
+  controller.getDashboardStats
+);
+
 // Audit
 router.get('/audit',
   requirePermission(PERMISSIONS.AUDIT_READ),

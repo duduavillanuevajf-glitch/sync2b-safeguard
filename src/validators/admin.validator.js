@@ -8,6 +8,7 @@ const createUser = Joi.object({
   role: Joi.string().valid('org_admin', 'vault_manager', 'vault_viewer').required(),
   firstName: Joi.string().max(100).optional().allow('', null),
   lastName: Joi.string().max(100).optional().allow('', null),
+  require2fa: Joi.boolean().optional(),
 });
 
 const updateUser = Joi.object({

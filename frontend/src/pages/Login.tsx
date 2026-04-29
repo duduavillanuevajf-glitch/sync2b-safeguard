@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Lock, Mail, ArrowRight, Loader2, Smartphone, Eye, EyeOff } from 'lucide-react'
+import { Lock, Mail, ArrowRight, Loader2, Smartphone, Eye, EyeOff, Building2, Check } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -18,27 +18,52 @@ const totpSchema = z.object({
 })
 
 type LoginForm = z.infer<typeof loginSchema>
-type TotpForm = z.infer<typeof totpSchema>
+type TotpForm  = z.infer<typeof totpSchema>
+type OrgOption = { id: string; name: string; slug: string; role: string }
+type Step = 'credentials' | 'org_select' | 'totp'
+
+const STEP_LABELS: Record<Step, string> = {
+  credentials: 'Credenciais',
+  org_select:  'Organização',
+  totp:        'Verificação 2FA',
+}
+const STEPS: Step[] = ['credentials', 'org_select', 'totp']
 
 export function Login() {
-  const [step, setStep] = useState<'credentials' | 'totp'>('credentials')
+  const [step, setStep]           = useState<Step>('credentials')
   const [tempToken, setTempToken] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [orgs, setOrgs]           = useState<OrgOption[]>([])
+  const [selectedOrgId, setSelectedOrgId] = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
   const { setTokens, setUser } = useAuthStore()
 
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
-  const totpForm = useForm<TotpForm>({ resolver: zodResolver(totpSchema) })
+  const totpForm  = useForm<TotpForm>({ resolver: zodResolver(totpSchema) })
+
+  const finishAuth = async (accessToken: string, refreshToken: string) => {
+    setTokens(accessToken, refreshToken)
+    const user = await authService.getProfile()
+    setUser(user)
+    navigate('/dashboard', { replace: true })
+  }
 
   const onLogin = async (data: LoginForm) => {
     setLoading(true); setError('')
     try {
       const res = await authService.login(data.email, data.password)
+
+      if (res.requiresOrgSelection && res.organizations && res.organizations.length > 1) {
+        setTempToken(res.tempToken ?? '')
+        setOrgs(res.organizations)
+        setSelectedOrgId(res.organizations[0].id)
+        setStep('org_select')
+        return
+      }
       if (!res.requiresTwoFactor && res.accessToken && res.refreshToken) {
-        setTokens(res.accessToken, res.refreshToken)
-        navigate('/dashboard', { replace: true })
+        await finishAuth(res.accessToken, res.refreshToken)
         return
       }
       setTempToken(res.tempToken ?? '')
@@ -48,18 +73,37 @@ export function Login() {
     } finally { setLoading(false) }
   }
 
+  const onSelectOrg = async () => {
+    if (!selectedOrgId) return
+    setLoading(true); setError('')
+    try {
+      const res = await authService.selectOrg(tempToken, selectedOrgId)
+      if (!res.requiresTwoFactor && res.accessToken && res.refreshToken) {
+        await finishAuth(res.accessToken, res.refreshToken)
+        return
+      }
+      setTempToken(res.tempToken ?? '')
+      setStep('totp')
+    } catch (e: any) {
+      setError(e.response?.data?.error?.message || 'Erro ao selecionar organização')
+    } finally { setLoading(false) }
+  }
+
   const onTotp = async (data: TotpForm) => {
     setLoading(true); setError('')
     try {
       const tokens = await authService.verify2FA(tempToken, data.code)
-      setTokens(tokens.accessToken, tokens.refreshToken)
-      const user = await authService.getProfile()
-      setUser(user)
-      navigate('/dashboard')
+      await finishAuth(tokens.accessToken, tokens.refreshToken)
     } catch (e: any) {
       setError(e.response?.data?.error?.message || 'Código inválido')
     } finally { setLoading(false) }
   }
+
+  // Passos visíveis (remove org_select se não há multi-org)
+  const visibleSteps: Step[] = orgs.length > 1
+    ? ['credentials', 'org_select', 'totp']
+    : ['credentials', 'totp']
+  const stepIdx = visibleSteps.indexOf(step)
 
   return (
     <div className="w-full max-w-md">
@@ -80,32 +124,37 @@ export function Login() {
             />
           </div>
           <h2 className="text-2xl font-bold text-txt-primary mb-1">
-            {step === 'credentials' ? 'Acesso Corporativo' : 'Verificação 2FA'}
+            {step === 'credentials' ? 'Acesso Corporativo' :
+             step === 'org_select'  ? 'Selecionar Organização' :
+             'Verificação 2FA'}
           </h2>
           <p className="text-txt-secondary text-sm">
-            {step === 'credentials'
-              ? 'Autentique-se para acessar o cofre seguro'
-              : 'Insira o código do Google Authenticator'}
+            {step === 'credentials' ? 'Autentique-se para acessar o cofre seguro' :
+             step === 'org_select'  ? 'Escolha a organização que deseja acessar' :
+             'Insira o código do Google Authenticator'}
           </p>
         </div>
 
         {/* Step indicators */}
         <div className="flex items-center gap-2 mb-8">
-          {['credentials', 'totp'].map((s, i) => (
+          {visibleSteps.map((s, i) => (
             <div key={s} className="flex items-center gap-2 flex-1">
               <div className={cn(
                 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-300',
                 step === s ? 'bg-brand border-brand text-white shadow-brand'
-                  : i < ['credentials','totp'].indexOf(step) ? 'bg-brand/20 border-brand/40 text-brand'
+                  : i < stepIdx ? 'bg-brand/20 border-brand/40 text-brand'
                   : 'bg-transparent border-border text-txt-muted'
               )}>{i + 1}</div>
-              {i === 0 && <div className={cn('flex-1 h-px', step === 'totp' ? 'bg-brand/40' : 'bg-border')} />}
+              {i < visibleSteps.length - 1 && (
+                <div className={cn('flex-1 h-px', i < stepIdx ? 'bg-brand/40' : 'bg-border')} />
+              )}
             </div>
           ))}
         </div>
 
         <AnimatePresence mode="wait">
-          {step === 'credentials' ? (
+          {/* ── Step 1: Credentials ── */}
+          {step === 'credentials' && (
             <motion.form
               key="credentials"
               initial={{ opacity: 0, x: -20 }}
@@ -147,12 +196,8 @@ export function Login() {
                     onClick={() => setShowPassword(v => !v)}
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-primary transition-colors"
                     tabIndex={-1}
-                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   >
-                    {showPassword
-                      ? <EyeOff className="w-4 h-4" />
-                      : <Eye className="w-4 h-4" />
-                    }
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 {loginForm.formState.errors.password && (
@@ -168,8 +213,7 @@ export function Login() {
 
               {error && (
                 <motion.div initial={{opacity:0}} animate={{opacity:1}}
-                  className="flex items-center gap-2 p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm"
-                >
+                  className="flex items-center gap-2 p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm">
                   <span className="text-base">⚠</span> {error}
                 </motion.div>
               )}
@@ -178,7 +222,68 @@ export function Login() {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Entrar <ArrowRight className="w-4 h-4" /></>}
               </button>
             </motion.form>
-          ) : (
+          )}
+
+          {/* ── Step 1.5: Org selector ── */}
+          {step === 'org_select' && (
+            <motion.div
+              key="org_select"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                {orgs.map(org => (
+                  <button
+                    key={org.id}
+                    type="button"
+                    onClick={() => setSelectedOrgId(org.id)}
+                    className={cn(
+                      'w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left',
+                      selectedOrgId === org.id
+                        ? 'bg-brand/10 border-brand/40 text-brand'
+                        : 'bg-bg-elevated border-border hover:border-brand/20 text-txt-primary'
+                    )}
+                  >
+                    <div className={cn(
+                      'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+                      selectedOrgId === org.id ? 'bg-brand/20' : 'bg-bg-panel'
+                    )}>
+                      <Building2 className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{org.name}</p>
+                      <p className="text-xs text-txt-muted truncate">{org.slug}</p>
+                    </div>
+                    {selectedOrgId === org.id && (
+                      <Check className="w-4 h-4 text-brand shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {error && (
+                <motion.div initial={{opacity:0}} animate={{opacity:1}}
+                  className="flex items-center gap-2 p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm">
+                  <span>⚠</span> {error}
+                </motion.div>
+              )}
+
+              <button onClick={onSelectOrg} disabled={loading || !selectedOrgId}
+                className="btn-primary w-full flex items-center justify-center gap-2 h-11">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continuar <ArrowRight className="w-4 h-4" /></>}
+              </button>
+
+              <button type="button" onClick={() => { setStep('credentials'); setError('') }}
+                className="w-full text-sm text-txt-muted hover:text-txt-primary transition-colors text-center">
+                ← Voltar
+              </button>
+            </motion.div>
+          )}
+
+          {/* ── Step 2: TOTP ── */}
+          {step === 'totp' && (
             <motion.form
               key="totp"
               initial={{ opacity: 0, x: 20 }}
@@ -213,8 +318,7 @@ export function Login() {
 
               {error && (
                 <motion.div initial={{opacity:0}} animate={{opacity:1}}
-                  className="flex items-center gap-2 p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm"
-                >
+                  className="flex items-center gap-2 p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm">
                   <span>⚠</span> {error}
                 </motion.div>
               )}
@@ -223,7 +327,7 @@ export function Login() {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Acessar <ArrowRight className="w-4 h-4" /></>}
               </button>
 
-              <button type="button" onClick={() => { setStep('credentials'); setError('') }}
+              <button type="button" onClick={() => { setStep(orgs.length > 1 ? 'org_select' : 'credentials'); setError('') }}
                 className="w-full text-sm text-txt-muted hover:text-txt-primary transition-colors text-center">
                 ← Voltar
               </button>

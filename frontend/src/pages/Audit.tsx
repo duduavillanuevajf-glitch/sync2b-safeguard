@@ -41,6 +41,8 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   'TEAM_DELETED':              { label: 'Equipe excluída',         color: 'text-danger bg-danger/10' },
   'TEAM_MEMBER_ADDED':         { label: 'Membro adicionado',       color: 'text-brand bg-brand/10' },
   'TEAM_MEMBER_REMOVED':       { label: 'Membro removido',         color: 'text-slate-400 bg-slate-400/10' },
+  '2FA_RESET':                 { label: '2FA resetado',            color: 'text-yellow-400 bg-yellow-400/10' },
+  '2FA_DISABLED':              { label: '2FA desativado',          color: 'text-slate-400 bg-slate-400/10' },
 }
 
 export function Audit() {

@@ -61,7 +61,7 @@ class UserRepository extends BaseRepository {
   async listByOrganization(organizationId, { limit, offset }, trx) {
     const client = trx || db;
     const { rows } = await client.query(
-      `SELECT id, email, role, first_name, last_name, is_active, last_login_at, created_at
+      `SELECT id, email, role, first_name, last_name, is_active, otp_enabled, last_login_at, created_at
        FROM users WHERE organization_id = $1
        ORDER BY created_at DESC
        LIMIT $2 OFFSET $3`,
@@ -119,6 +119,57 @@ class UserRepository extends BaseRepository {
       `UPDATE users SET otp_secret = $1, otp_enabled = TRUE WHERE id = $2`,
       [otpSecret, id]
     );
+  }
+
+  async disableOtp(id, organizationId, trx) {
+    const client = trx || db;
+    await client.query(
+      `UPDATE users SET otp_secret = NULL, otp_enabled = FALSE
+       WHERE id = $1 AND organization_id = $2`,
+      [id, organizationId]
+    );
+  }
+
+  async resetOtpSecret(id, organizationId, newSecret, trx) {
+    const client = trx || db;
+    await client.query(
+      `UPDATE users SET otp_secret = $1, otp_enabled = TRUE
+       WHERE id = $2 AND organization_id = $3`,
+      [newSecret, id, organizationId]
+    );
+  }
+
+  // Retorna todos os vínculos org de um e-mail (multi-org)
+  async findOrgsByEmail(email, trx) {
+    const client = trx || db;
+    const { rows } = await client.query(
+      `SELECT uo.organization_id, uo.role, uo.is_active AS membership_active,
+              o.name  AS org_name, o.slug AS org_slug, o.is_active AS org_active,
+              u.id    AS user_id,  u.email,
+              u.is_active AS user_active, u.otp_enabled,
+              u.password_hash, u.failed_login_attempts, u.locked_until
+       FROM users u
+       JOIN user_organizations uo ON uo.user_id = u.id
+       JOIN organizations o        ON o.id = uo.organization_id
+       WHERE u.email = $1
+         AND u.is_active = TRUE
+         AND uo.is_active = TRUE
+         AND o.is_active  = TRUE
+       ORDER BY o.name`,
+      [email.toLowerCase()]
+    );
+    return rows;
+  }
+
+  // Retorna o papel do usuário em uma organização específica
+  async findMembership(userId, organizationId, trx) {
+    const client = trx || db;
+    const { rows } = await client.query(
+      `SELECT role, is_active FROM user_organizations
+       WHERE user_id = $1 AND organization_id = $2 LIMIT 1`,
+      [userId, organizationId]
+    );
+    return rows[0] || null;
   }
 
   async update(id, organizationId, fields, trx) {

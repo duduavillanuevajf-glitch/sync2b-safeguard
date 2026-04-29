@@ -25,12 +25,12 @@ const REFRESH_TTL_DAYS = 7;
 
 // ── JWT helpers ──────────────────────────────────────────────────────────────
 
-async function _signTokens(user) {
+async function _signTokens(user, orgId, role) {
   const { accessSecret, refreshSecret } = await secrets.getJwtSecrets();
   const payload = {
     sub: user.id,
-    org: user.organization_id,
-    role: user.role,
+    org: orgId || user.organization_id,
+    role: role || user.role,
     type: 'access',
   };
   const accessToken = jwt.sign(payload, accessSecret, {
@@ -80,6 +80,13 @@ async function register({ orgName, orgSlug, email, password, firstName, lastName
       lastName,
     }, trx);
 
+    // Populate junction table
+    await trx.query(
+      `INSERT INTO user_organizations (user_id, organization_id, role)
+       VALUES ($1, $2, 'org_admin') ON CONFLICT DO NOTHING`,
+      [user.id, org.id]
+    );
+
     const qrCode = await qrcode.toDataURL(otpSecret.otpauth_url);
 
     await auditRepo.log({
@@ -99,49 +106,96 @@ async function register({ orgName, orgSlug, email, password, firstName, lastName
 // ── Login step 1: email + password ───────────────────────────────────────────
 
 async function loginStep1({ email, password, ipAddress, userAgent }) {
-  // ── DEBUG LOGIN (remover após diagnóstico) ───────────────────────────────
+  // Tenta busca multi-org (requer migration 004); caso a tabela não exista, usa fluxo legado.
+  let orgMemberships = [];
   try {
-    console.log('========== LOGIN DEBUG ==========');
-    console.log('EMAIL RECEBIDO:', JSON.stringify(email));
-
-    const rawResult = await db.query(
-      `SELECT u.id, u.email, u.password_hash, u.is_active,
-              u.otp_enabled, u.failed_login_attempts, u.locked_until,
-              o.is_active AS org_active, o.slug AS org_slug
-       FROM users u
-       JOIN organizations o ON o.id = u.organization_id
-       WHERE u.email = $1 LIMIT 1`,
-      [email ? email.toLowerCase() : ''],
-    );
-    const row = rawResult.rows[0];
-    console.log('USER NO BANCO (sem filtro):', row ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
-    if (row) {
-      console.log('  email:', row.email);
-      console.log('  is_active:', row.is_active);
-      console.log('  org_active:', row.org_active);
-      console.log('  org_slug:', row.org_slug);
-      console.log('  otp_enabled:', row.otp_enabled);
-      console.log('  failed_login_attempts:', row.failed_login_attempts);
-      console.log('  locked_until:', row.locked_until);
-      console.log('  hash_prefix:', row.password_hash ? row.password_hash.substring(0, 20) : 'NULL');
-      const match = await bcrypt.compare(password, row.password_hash);
-      console.log('  PASSWORD LENGTH:', password ? password.length : 0);
-      console.log('  BCRYPT RESULT:', match);
-    }
-    const viaService = await userRepo.findByEmailAcrossOrgs(email);
-    console.log('findByEmailAcrossOrgs:', viaService ? 'ENCONTRADO' : 'NULL (is_active ou org_active = false)');
-    console.log('=================================');
-  } catch (debugErr) {
-    console.log('DEBUG ERROR:', debugErr.message);
+    orgMemberships = await userRepo.findOrgsByEmail(email);
+  } catch (_) {
+    // Tabela user_organizations ainda não criada — fallback para método legado
+    orgMemberships = [];
   }
-  // ── FIM DEBUG ────────────────────────────────────────────────────────────
 
-  const user = await userRepo.findByEmailAcrossOrgs(email);
+  if (orgMemberships.length === 0) {
+    // Fluxo legado (organização única por usuário)
+    const user = await userRepo.findByEmailAcrossOrgs(email);
+    if (!user) throw new AuthenticationError('Credenciais inválidas');
+    if (!user.org_active)  throw new ForbiddenError('Organização inativa');
+    if (!user.is_active)   throw new ForbiddenError('Conta desativada');
+    return _checkLockAndPassword(user, password, user.organization_id, user.role, ipAddress, userAgent);
+  }
 
-  if (!user) throw new AuthenticationError('Credenciais inválidas');
-  if (!user.org_active) throw new ForbiddenError('Organização inativa');
-  if (!user.is_active) throw new ForbiddenError('Conta desativada');
+  const first = orgMemberships[0];
 
+  if (first.locked_until && new Date(first.locked_until) > new Date()) {
+    const wait = Math.ceil((new Date(first.locked_until) - Date.now()) / 60000);
+    throw new AuthenticationError(`Conta bloqueada. Tente novamente em ${wait} minuto(s).`, 'ACCOUNT_LOCKED');
+  }
+
+  const valid = await bcrypt.compare(password, first.password_hash);
+  if (!valid) {
+    await userRepo.incrementFailedAttempts(first.user_id);
+    await auditRepo.log({
+      organizationId: first.organization_id,
+      userId: first.user_id,
+      action: 'LOGIN_FAILED',
+      ipAddress,
+      status: 'failure',
+      metadata: { reason: 'invalid_password' },
+    });
+    throw new AuthenticationError('Credenciais inválidas');
+  }
+
+  await userRepo.resetFailedAttempts(first.user_id);
+  const user = await userRepo.findById(first.user_id);
+
+  // Múltiplas organizações → pede seleção
+  if (orgMemberships.length > 1) {
+    const { accessSecret } = await secrets.getJwtSecrets();
+    const tempToken = jwt.sign(
+      { sub: user.id, type: 'org_select' },
+      accessSecret,
+      { expiresIn: '5m' }
+    );
+    return {
+      requiresOrgSelection: true,
+      tempToken,
+      organizations: orgMemberships.map(m => ({
+        id: m.organization_id,
+        name: m.org_name,
+        slug: m.org_slug,
+        role: m.role,
+      })),
+    };
+  }
+
+  // Organização única — continua fluxo normal
+  return _proceedAfterPassword(user, first.organization_id, first.role, ipAddress, userAgent);
+}
+
+// ── Login step 1.5: selecionar organização ────────────────────────────────────
+
+async function loginSelectOrg({ tempToken, organizationId, ipAddress, userAgent }) {
+  const { accessSecret } = await secrets.getJwtSecrets();
+  let decoded;
+  try {
+    decoded = jwt.verify(tempToken, accessSecret);
+  } catch {
+    throw new AuthenticationError('Token temporário inválido ou expirado');
+  }
+  if (decoded.type !== 'org_select') throw new AuthenticationError('Token inválido');
+
+  const membership = await userRepo.findMembership(decoded.sub, organizationId);
+  if (!membership || !membership.is_active) throw new ForbiddenError('Acesso negado a esta organização');
+
+  const user = await userRepo.findById(decoded.sub);
+  if (!user) throw new AuthenticationError('Usuário não encontrado');
+
+  return _proceedAfterPassword(user, organizationId, membership.role, ipAddress, userAgent);
+}
+
+// ── Helpers internos ──────────────────────────────────────────────────────────
+
+async function _checkLockAndPassword(user, password, orgId, role, ipAddress, userAgent) {
   if (user.locked_until && new Date(user.locked_until) > new Date()) {
     const wait = Math.ceil((new Date(user.locked_until) - Date.now()) / 60000);
     throw new AuthenticationError(`Conta bloqueada. Tente novamente em ${wait} minuto(s).`, 'ACCOUNT_LOCKED');
@@ -151,7 +205,7 @@ async function loginStep1({ email, password, ipAddress, userAgent }) {
   if (!valid) {
     const result = await userRepo.incrementFailedAttempts(user.id);
     await auditRepo.log({
-      organizationId: user.organization_id,
+      organizationId: orgId,
       userId: user.id,
       action: 'LOGIN_FAILED',
       ipAddress,
@@ -161,40 +215,34 @@ async function loginStep1({ email, password, ipAddress, userAgent }) {
     throw new AuthenticationError('Credenciais inválidas');
   }
 
-  // Se TOTP não está configurado, completa a autenticação imediatamente no step 1.
-  // O usuário será redirecionado para configurar o 2FA após o primeiro acesso.
-  if (!user.otp_enabled && !user.otp_secret) {
-    await userRepo.resetFailedAttempts(user.id);
+  await userRepo.resetFailedAttempts(user.id);
+  return _proceedAfterPassword(user, orgId, role, ipAddress, userAgent);
+}
 
-    const { accessToken, rawRefresh, refreshHash, familyId, expiresAt } = await _signTokens(user);
+async function _proceedAfterPassword(user, orgId, role, ipAddress, userAgent) {
+  // 2FA não configurado → completa imediatamente
+  if (!user.otp_enabled && !user.otp_secret) {
+    const { accessToken, rawRefresh, refreshHash, familyId, expiresAt } = await _signTokens(user, orgId, role);
     await tokenRepo.createRefreshToken({
       userId: user.id, tokenHash: refreshHash, familyId, expiresAt, ipAddress, userAgent,
     });
-
     await auditRepo.log({
-      organizationId: user.organization_id,
+      organizationId: orgId,
       userId: user.id,
       action: 'LOGIN_SUCCESS',
       ipAddress,
       metadata: { twoFactor: false, userAgent },
     });
-
-    return {
-      requiresTwoFactor: false,
-      accessToken,
-      refreshToken: rawRefresh,
-      expiresIn: ACCESS_TTL,
-    };
+    return { requiresTwoFactor: false, accessToken, refreshToken: rawRefresh, expiresIn: ACCESS_TTL };
   }
 
-  // TOTP configurado — emite token temporário para o step 2
+  // 2FA configurado → emite temp token para step 2
   const { accessSecret } = await secrets.getJwtSecrets();
   const tempToken = jwt.sign(
-    { sub: user.id, org: user.organization_id, type: 'temp' },
+    { sub: user.id, org: orgId, role, type: 'temp' },
     accessSecret,
     { expiresIn: '5m' }
   );
-
   return { tempToken, requiresTwoFactor: true };
 }
 
@@ -222,7 +270,7 @@ async function loginStep2({ tempToken, totpCode, ipAddress, userAgent }) {
   });
   if (!valid) {
     await auditRepo.log({
-      organizationId: user.organization_id,
+      organizationId: decoded.org || user.organization_id,
       userId: user.id,
       action: 'LOGIN_2FA_FAILED',
       ipAddress,
@@ -234,11 +282,13 @@ async function loginStep2({ tempToken, totpCode, ipAddress, userAgent }) {
 
   await userRepo.resetFailedAttempts(user.id);
 
-  const { accessToken, rawRefresh, refreshHash, familyId, expiresAt } = await _signTokens(user);
+  const orgId = decoded.org || user.organization_id;
+  const role  = decoded.role || user.role;
+  const { accessToken, rawRefresh, refreshHash, familyId, expiresAt } = await _signTokens(user, orgId, role);
   await tokenRepo.createRefreshToken({ userId: user.id, tokenHash: refreshHash, familyId, expiresAt, ipAddress, userAgent });
 
   await auditRepo.log({
-    organizationId: user.organization_id,
+    organizationId: orgId,
     userId: user.id,
     action: 'LOGIN_SUCCESS',
     ipAddress,
@@ -377,6 +427,6 @@ async function changePassword({ userId, currentPassword, newPassword, ipAddress 
 }
 
 module.exports = {
-  register, loginStep1, loginStep2, refreshTokens, logout,
+  register, loginStep1, loginSelectOrg, loginStep2, refreshTokens, logout,
   verifyAccessToken, forgotPassword, validateResetToken, resetPassword, changePassword,
 };
