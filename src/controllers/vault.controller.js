@@ -44,6 +44,18 @@ async function getItem(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function revealSecret(req, res, next) {
+  try {
+    const result = await vaultService.revealSecret({
+      id: req.params.id,
+      organizationId: req.user.organizationId,
+      userId: req.user.id,
+      ipAddress: _ip(req),
+    });
+    success(res, result);
+  } catch (err) { next(err); }
+}
+
 async function updateItem(req, res, next) {
   try {
     await vaultService.updateItem({
@@ -165,7 +177,7 @@ async function importItems(req, res, next) {
 }
 
 module.exports = {
-  createItem, listItems, getItem, updateItem, toggleArchive, deleteItem,
+  createItem, listItems, getItem, revealSecret, updateItem, toggleArchive, deleteItem,
   getAlerts, getHistory, getItemHistory,
   exportCsv, exportXlsx, downloadTemplate, importItems,
 };

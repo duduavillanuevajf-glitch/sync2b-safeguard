@@ -66,6 +66,11 @@ export const vaultService = {
     await api.delete(`/credentials/${id}`)
   },
 
+  async revealSecret(id: string) {
+    const { data } = await api.get(`/credentials/${id}/secret`)
+    return data.data as { password: string }
+  },
+
   async getHistory(id: string) {
     const { data } = await api.get(`/credentials/${id}/history`)
     return data.data as VaultHistory[]

@@ -13,6 +13,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   'CREDENTIAL_DELETED':        { label: 'Credencial excluída',     color: 'text-danger bg-danger/10' },
   'CREDENTIAL_ARCHIVED':       { label: 'Credencial arquivada',    color: 'text-slate-400 bg-slate-400/10' },
   'CREDENTIAL_UNARCHIVED':     { label: 'Credencial reativada',    color: 'text-brand bg-brand/10' },
+  'CREDENTIAL_SECRET_VIEWED':  { label: 'Senha visualizada',       color: 'text-orange-400 bg-orange-400/10' },
   'CREDENTIAL_EXPORTED':       { label: 'Exportação',              color: 'text-purple-400 bg-purple-400/10' },
   'CREDENTIAL_IMPORTED':       { label: 'Importação',              color: 'text-orange-400 bg-orange-400/10' },
   'TAG_CREATED':               { label: 'Tag criada',              color: 'text-teal-400 bg-teal-400/10' },

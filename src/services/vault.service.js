@@ -126,22 +126,13 @@ async function _assertCanAccess(item, userId) {
   }
 }
 
-// ── Get by ID (with decryption) ───────────────────────────────────────────────
+// ── Get by ID (metadata only, no password) ───────────────────────────────────
 
 async function getItem({ id, organizationId, userId, ipAddress }) {
   const item = await vaultRepo.findById(id, organizationId);
   if (!item) throw new NotFoundError('Credencial');
 
   await _assertCanAccess(item, userId);
-
-  const password = await cryptoSvc.decrypt(
-    item.encrypted_password,
-    item.encryption_iv,
-    item.encryption_tag,
-    item.encryption_version
-  );
-
-  await vaultRepo.touchAccessed(id, organizationId);
 
   await auditRepo.logVaultHistory({
     vaultItemId: id,
@@ -159,7 +150,6 @@ async function getItem({ id, organizationId, userId, ipAddress }) {
     dns: item.dns,
     port: item.port,
     username: item.username,
-    password,
     notes: item.notes,
     tags: item.tags,
     category: item.category,
@@ -171,6 +161,48 @@ async function getItem({ id, organizationId, userId, ipAddress }) {
     updatedAt: item.updated_at,
     isArchived: item.is_archived,
   };
+}
+
+// ── Reveal secret (audited) ───────────────────────────────────────────────────
+
+async function revealSecret({ id, organizationId, userId, ipAddress }) {
+  const item = await vaultRepo.findById(id, organizationId);
+  if (!item) throw new NotFoundError('Credencial');
+
+  await _assertCanAccess(item, userId);
+
+  if (!item.encrypted_password || !item.encryption_iv || !item.encryption_tag) {
+    throw new UnprocessableError('Esta credencial não possui senha armazenada.');
+  }
+
+  const password = await cryptoSvc.decrypt(
+    item.encrypted_password,
+    item.encryption_iv,
+    item.encryption_tag,
+    item.encryption_version
+  );
+
+  await vaultRepo.touchAccessed(id, organizationId);
+
+  await auditRepo.logVaultHistory({
+    vaultItemId: id,
+    organizationId,
+    userId,
+    action: 'SECRET_VIEWED',
+    ipAddress,
+  });
+
+  await auditRepo.log({
+    organizationId,
+    userId,
+    action: 'CREDENTIAL_SECRET_VIEWED',
+    resourceType: 'credential',
+    resourceId: id,
+    ipAddress,
+    metadata: { title: item.name },
+  });
+
+  return { password };
 }
 
 // ── Update ────────────────────────────────────────────────────────────────────
@@ -392,6 +424,6 @@ async function exportXlsx({ organizationId, userId, ipAddress }) {
 }
 
 module.exports = {
-  createItem, listItems, getItem, updateItem,
+  createItem, listItems, getItem, revealSecret, updateItem,
   toggleArchive, deleteItem, getStaleAlerts, exportCsv, exportXlsx,
 };

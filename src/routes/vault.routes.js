@@ -78,6 +78,11 @@ router.get('/:id',
   controller.getItem
 );
 
+router.get('/:id/secret',
+  requirePermission(PERMISSIONS.VAULT_VIEW_SECRET),
+  controller.revealSecret
+);
+
 router.put('/:id',
   requirePermission(PERMISSIONS.VAULT_UPDATE),
   validate(schema.updateVaultItem),

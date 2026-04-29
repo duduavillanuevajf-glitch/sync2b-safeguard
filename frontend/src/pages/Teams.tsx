@@ -6,8 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { adminService } from '@/services/vault.service'
-import { teamsService, type Team, type TeamMember } from '@/services/teams.service'
+import { teamsService, type Team, type TeamMember, type OrgUser } from '@/services/teams.service'
 import { cn } from '@/utils/cn'
 
 const teamSchema = z.object({
@@ -72,9 +71,9 @@ function MembersPanel({ team, onClose }: { team: Team; onClose: () => void }) {
     queryFn: () => teamsService.listMembers(team.id),
   })
 
-  const { data: allUsers } = useQuery({
-    queryKey: ['users-all'],
-    queryFn: () => adminService.listUsers({ limit: 200 }),
+  const { data: orgUsers = [] } = useQuery({
+    queryKey: ['org-users'],
+    queryFn: () => teamsService.listOrgUsers(),
   })
 
   const addMut = useMutation({
@@ -88,7 +87,7 @@ function MembersPanel({ team, onClose }: { team: Team; onClose: () => void }) {
   })
 
   const memberIds = new Set(members.map((m: TeamMember) => m.userId))
-  const available = (allUsers?.users ?? []).filter((u: any) =>
+  const available = orgUsers.filter((u: OrgUser) =>
     !memberIds.has(u.id) &&
     (search === '' || u.email.includes(search) || (u.firstName || '').toLowerCase().includes(search.toLowerCase()))
   )
@@ -148,7 +147,7 @@ function MembersPanel({ team, onClose }: { team: Team; onClose: () => void }) {
             <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
               {available.length === 0 ? (
                 <p className="text-xs text-txt-muted text-center py-8">Sem usuários disponíveis</p>
-              ) : available.map((u: any) => (
+              ) : available.map((u: OrgUser) => (
                 <div key={u.id} className="flex items-center gap-2 p-2 rounded-xl bg-bg-elevated border border-border group">
                   <div className="w-7 h-7 rounded-lg bg-bg-panel flex items-center justify-center text-xs font-bold text-txt-muted shrink-0">
                     {(u.firstName?.[0] || u.email[0]).toUpperCase()}

@@ -19,7 +19,20 @@ export interface TeamMember {
   addedAt: string
 }
 
+export interface OrgUser {
+  id: string
+  email: string
+  firstName?: string
+  lastName?: string
+  role: string
+}
+
 export const teamsService = {
+  async listOrgUsers() {
+    const { data } = await api.get('/teams/org-users')
+    return data.data as OrgUser[]
+  },
+
   async list() {
     const { data } = await api.get('/teams')
     return data.data as Team[]

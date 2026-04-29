@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { KeyRound, ArrowLeft, Edit, Trash2, Clock, Globe, Database, FileText, Tag, History, UsersRound } from 'lucide-react'
+import { KeyRound, ArrowLeft, Edit, Trash2, Clock, Globe, Database, FileText, Tag, History, UsersRound, Eye, EyeOff, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { vaultService } from '@/services/vault.service'
 import { teamsService } from '@/services/teams.service'
@@ -19,6 +19,9 @@ export function VaultDetail() {
   const { hasPermission } = useAuth()
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [revealedPassword, setRevealedPassword] = useState<string | null>(null)
+  const [revealing, setRevealing] = useState(false)
+  const [revealError, setRevealError] = useState<string | null>(null)
 
   const { data: item, isLoading } = useQuery({
     queryKey: ['vault', id],
@@ -46,6 +49,21 @@ export function VaultDetail() {
     queryKey: ['teams'],
     queryFn: () => teamsService.list(),
   })
+
+  const handleReveal = async () => {
+    if (revealedPassword !== null) { setRevealedPassword(null); setRevealError(null); return }
+    setRevealing(true)
+    setRevealError(null)
+    try {
+      const result = await vaultService.revealSecret(id!)
+      setRevealedPassword(result.password)
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Não foi possível revelar a senha.'
+      setRevealError(msg)
+    } finally {
+      setRevealing(false)
+    }
+  }
 
   if (isLoading) return (
     <div className="space-y-4">
@@ -106,9 +124,35 @@ export function VaultDetail() {
           {/* Password */}
           <div className="space-y-1">
             <label className="text-xs font-semibold text-txt-secondary uppercase tracking-wide">Senha</label>
-            <PasswordField value={item.password || ''} readOnly />
-            {!item.password && (
-              <p className="text-xs text-txt-muted">Não foi possível carregar a senha.</p>
+            {hasPermission('credential:view_secret') ? (
+              <div className="space-y-2">
+                {revealedPassword !== null ? (
+                  <PasswordField value={revealedPassword} readOnly />
+                ) : (
+                  <div className="input-field flex items-center gap-2 text-txt-muted select-none">
+                    <Lock className="w-4 h-4 shrink-0" />
+                    <span className="text-sm">••••••••••••</span>
+                  </div>
+                )}
+                <button onClick={handleReveal} disabled={revealing}
+                  className="flex items-center gap-1.5 text-xs text-brand hover:text-brand-dim transition-colors disabled:opacity-50">
+                  {revealing ? (
+                    <span>Carregando...</span>
+                  ) : revealedPassword !== null ? (
+                    <><EyeOff className="w-3.5 h-3.5" /> Ocultar senha</>
+                  ) : (
+                    <><Eye className="w-3.5 h-3.5" /> Revelar senha</>
+                  )}
+                </button>
+                {revealError && (
+                  <p className="text-xs text-danger">{revealError}</p>
+                )}
+              </div>
+            ) : (
+              <div className="input-field flex items-center gap-2 text-txt-muted">
+                <Lock className="w-4 h-4 shrink-0" />
+                <span className="text-sm">Sem permissão para visualizar</span>
+              </div>
             )}
           </div>
 

@@ -7,6 +7,8 @@ const { requirePermission, PERMISSIONS } = require('../middlewares/rbac.middlewa
 
 router.use(authenticate);
 
+router.get('/org-users', requirePermission(PERMISSIONS.VAULT_READ), controller.listOrgUsers);
+
 router.get('/',    requirePermission(PERMISSIONS.VAULT_READ), controller.listTeams);
 router.post('/',   requirePermission(PERMISSIONS.USERS_CREATE), controller.createTeam);
 

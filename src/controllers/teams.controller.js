@@ -91,6 +91,22 @@ async function deleteTeam(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function listOrgUsers(req, res, next) {
+  try {
+    const rows = await userRepo.listByOrganization(req.user.organizationId, { limit: 500, offset: 0 });
+    const users = rows
+      .filter(u => u.is_active)
+      .map(u => ({
+        id: u.id,
+        email: u.email,
+        firstName: u.first_name || null,
+        lastName: u.last_name || null,
+        role: u.role,
+      }));
+    success(res, users);
+  } catch (err) { next(err); }
+}
+
 async function listMembers(req, res, next) {
   try {
     const rows = await teamsRepo.listMembers(req.params.id, req.user.organizationId);
@@ -150,5 +166,5 @@ async function removeMember(req, res, next) {
 
 module.exports = {
   listTeams, createTeam, getTeam, updateTeam, deleteTeam,
-  listMembers, addMember, removeMember,
+  listOrgUsers, listMembers, addMember, removeMember,
 };
