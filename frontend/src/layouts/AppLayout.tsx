@@ -2,6 +2,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sidebar } from '@/components/sidebar/Sidebar'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { useAuthStore } from '@/store/auth.store'
 import { authService } from '@/services/auth.service'
 import { useTheme } from '@/hooks/useTheme'
@@ -32,6 +33,7 @@ export function AppLayout() {
         <header className="h-16 shrink-0 border-b border-border flex items-center px-6 bg-bg-secondary/60 backdrop-blur-xl">
           <div className="flex-1" />
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/20">
               <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
               <span className="text-xs font-medium text-success">Sistema operacional</span>

@@ -12,13 +12,37 @@ export const vaultService = {
     return data.data as VaultItem
   },
 
-  async create(payload: Partial<VaultItem>) {
-    const { data } = await api.post('/vault', payload)
+  async create(payload: Partial<VaultItem> & { password?: string }) {
+    const { data } = await api.post('/vault', {
+      name: payload.title,
+      service: payload.serviceType,
+      username: payload.username,
+      password: payload.password,
+      host: payload.host || undefined,
+      dns: payload.dns || undefined,
+      port: payload.port || undefined,
+      notes: payload.notes || undefined,
+      tags: payload.tags || [],
+      category: payload.category || undefined,
+      expiresAt: payload.expiresAt || undefined,
+    })
     return data.data
   },
 
-  async update(id: string, payload: Partial<VaultItem>) {
-    await api.put(`/vault/${id}`, payload)
+  async update(id: string, payload: Partial<VaultItem> & { password?: string }) {
+    await api.put(`/vault/${id}`, {
+      name: payload.title,
+      service: payload.serviceType,
+      username: payload.username,
+      password: payload.password || undefined,
+      host: payload.host || undefined,
+      dns: payload.dns || undefined,
+      port: payload.port || undefined,
+      notes: payload.notes || undefined,
+      tags: payload.tags || [],
+      category: payload.category || undefined,
+      expiresAt: payload.expiresAt || undefined,
+    })
   },
 
   async toggle(id: string) {

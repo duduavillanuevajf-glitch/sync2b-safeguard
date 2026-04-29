@@ -32,7 +32,7 @@ export function VaultDetail() {
   })
 
   const updateMut = useMutation({
-    mutationFn: (d: Partial<VaultItem>) => vaultService.update(id!, d),
+    mutationFn: (d: Partial<VaultItem> & { password?: string }) => vaultService.update(id!, d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['vault', id] }); setModalOpen(false) },
   })
 
@@ -112,11 +112,11 @@ export function VaultDetail() {
             </div>
           )}
 
-          {/* Database */}
-          {item.database && (
+          {/* DNS */}
+          {item.dns && (
             <div className="flex items-center gap-2 text-sm text-txt-secondary">
               <Database className="w-4 h-4 text-txt-muted" />
-              <span className="font-mono">{item.database}</span>
+              <span className="font-mono">{item.dns}</span>
             </div>
           )}
 

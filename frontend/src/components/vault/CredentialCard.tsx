@@ -5,6 +5,7 @@ import type { VaultItem } from '@/types'
 import { ServiceBadge, AlertBadge, StatusBadge } from '@/components/ui/Badge'
 import { fRelative } from '@/utils/format'
 import { copyToClipboard } from '@/utils/format'
+import { cn } from '@/utils/cn'
 
 interface Props {
   item: VaultItem
@@ -39,9 +40,19 @@ export function CredentialCard({ item, onView, onEdit, onDelete, canEdit = true,
         <StatusBadge active={!item.isArchived} />
       </div>
 
-      <h3 className="text-sm font-semibold text-txt-primary mb-1 truncate group-hover:text-brand transition-colors">
-        {item.title}
-      </h3>
+      <div className="flex items-center gap-2 mb-1">
+        <h3 className="text-sm font-semibold text-txt-primary truncate group-hover:text-brand transition-colors flex-1">
+          {item.title}
+        </h3>
+        {item.category && (
+          <span className={cn(
+            'text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded flex-shrink-0',
+            item.category === 'pessoal' ? 'text-info bg-info/10' : 'text-brand bg-brand/10'
+          )}>
+            {item.category}
+          </span>
+        )}
+      </div>
 
       <div className="flex items-center gap-1.5 mb-3">
         <span className="text-xs text-txt-muted font-mono truncate flex-1">{item.username}</span>

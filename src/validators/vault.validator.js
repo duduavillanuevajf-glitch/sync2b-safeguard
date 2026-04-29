@@ -25,6 +25,8 @@ const listQuery = Joi.object({
   limit: Joi.number().integer().min(1).max(200).optional(),
   archived: Joi.string().valid('true', 'false').optional(),
   search: Joi.string().max(100).optional().allow(''),
+  service: Joi.string().max(100).optional().allow(''),
+  category: Joi.string().max(100).optional().allow(''),
   alertDays: Joi.number().integer().min(1).max(3650).optional(),
   sortBy: Joi.string().valid('created_at', 'updated_at', 'name', 'service').optional(),
   sortDir: Joi.string().valid('ASC', 'DESC').optional(),

@@ -33,14 +33,30 @@ class VaultRepository extends BaseRepository {
     return rows[0];
   }
 
-  async list(organizationId, { isArchived = false, limit, offset, search }, trx) {
+  async list(organizationId, { isArchived = false, limit, offset, search, service, category }, trx) {
     const client = trx || db;
-    const params = [organizationId, isArchived, limit, offset];
-    let searchClause = '';
+    const params = [organizationId, isArchived];
+    const extra = [];
+
     if (search) {
       params.push(`%${search}%`);
-      searchClause = `AND (v.name ILIKE $${params.length} OR v.host ILIKE $${params.length} OR v.username ILIKE $${params.length})`;
+      const i = params.length;
+      extra.push(`(v.name ILIKE $${i} OR v.host ILIKE $${i} OR v.username ILIKE $${i})`);
     }
+    if (service) {
+      params.push(service);
+      extra.push(`v.service = $${params.length}`);
+    }
+    if (category) {
+      params.push(category);
+      extra.push(`v.category ILIKE $${params.length}`);
+    }
+
+    const where = extra.length ? 'AND ' + extra.join(' AND ') : '';
+    params.push(limit, offset);
+    const li = params.length - 1;
+    const oi = params.length;
+
     const { rows } = await client.query(
       `SELECT v.id, v.name, v.host, v.dns, v.port, v.service, v.username,
               v.notes, v.tags, v.category, v.created_at, v.updated_at,
@@ -51,25 +67,37 @@ class VaultRepository extends BaseRepository {
        LEFT JOIN users u ON u.id = v.created_by
        WHERE v.organization_id = $1
          AND v.is_archived = $2
-         ${searchClause}
+         ${where}
        ORDER BY v.created_at DESC
-       LIMIT $3 OFFSET $4`,
+       LIMIT $${li} OFFSET $${oi}`,
       params
     );
     return rows;
   }
 
-  async countList(organizationId, { isArchived = false, search }, trx) {
+  async countList(organizationId, { isArchived = false, search, service, category }, trx) {
     const client = trx || db;
     const params = [organizationId, isArchived];
-    let searchClause = '';
+    const extra = [];
+
     if (search) {
       params.push(`%${search}%`);
-      searchClause = `AND (name ILIKE $${params.length} OR host ILIKE $${params.length} OR username ILIKE $${params.length})`;
+      const i = params.length;
+      extra.push(`(name ILIKE $${i} OR host ILIKE $${i} OR username ILIKE $${i})`);
     }
+    if (service) {
+      params.push(service);
+      extra.push(`service = $${params.length}`);
+    }
+    if (category) {
+      params.push(category);
+      extra.push(`category ILIKE $${params.length}`);
+    }
+
+    const where = extra.length ? 'AND ' + extra.join(' AND ') : '';
     const { rows } = await client.query(
       `SELECT COUNT(*) AS count FROM vault_items
-       WHERE organization_id = $1 AND is_archived = $2 ${searchClause}`,
+       WHERE organization_id = $1 AND is_archived = $2 ${where}`,
       params
     );
     return parseInt(rows[0].count, 10);

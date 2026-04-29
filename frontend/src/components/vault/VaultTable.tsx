@@ -68,7 +68,19 @@ export function VaultTable({ items, loading, onView, onEdit, onDelete, onToggle,
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <ServiceBadge service={item.serviceType} />
-                      <span className="text-sm font-medium text-txt-primary truncate max-w-[160px]">{item.title}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-txt-primary truncate max-w-[160px]">{item.title}</p>
+                        {item.category && (
+                          <span className={cn(
+                            'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded',
+                            item.category === 'pessoal'
+                              ? 'text-info bg-info/10'
+                              : 'text-brand bg-brand/10'
+                          )}>
+                            {item.category}
+                          </span>
+                        )}
+                      </div>
                       {item.staleDays && item.staleDays > 90 && <AlertBadge days={item.staleDays} />}
                     </div>
                   </td>

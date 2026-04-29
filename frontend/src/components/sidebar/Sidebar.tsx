@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Shield, LayoutDashboard, KeyRound, ScrollText, Users,
+  LayoutDashboard, KeyRound, ScrollText, Users,
   Upload, Bell, Settings, User, ChevronLeft, ChevronRight,
   LogOut, Building2, ShieldCheck,
 } from 'lucide-react'
@@ -52,9 +52,12 @@ export function Sidebar() {
 
       {/* Logo */}
       <div className="flex items-center h-16 px-4 border-b border-border shrink-0">
-        <div className="w-9 h-9 bg-brand-gradient rounded-xl flex items-center justify-center shadow-brand shrink-0">
-          <Shield className="w-5 h-5 text-white" />
-        </div>
+        <img
+          src="/sync2logo.png"
+          alt="Sync2B"
+          className="w-9 h-9 rounded-xl object-contain shrink-0"
+          draggable={false}
+        />
         <AnimatePresence>
           {!collapsed && (
             <motion.span
@@ -168,6 +171,33 @@ export function Sidebar() {
         </div>
 
         <button
+          onClick={toggleSidebar}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-txt-muted',
+            'hover:text-txt-primary hover:bg-white/[0.04] transition-all duration-200',
+            collapsed && 'justify-center'
+          )}
+          title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+        >
+          {collapsed
+            ? <ChevronRight className="w-[17px] h-[17px] shrink-0" />
+            : <ChevronLeft className="w-[17px] h-[17px] shrink-0" />
+          }
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.span
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                className="text-sm font-medium"
+              >
+                Recolher
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
+
+        <button
           onClick={handleLogout}
           className={cn(
             'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-txt-secondary',
@@ -191,16 +221,6 @@ export function Sidebar() {
           </AnimatePresence>
         </button>
       </div>
-
-      {/* Collapse toggle */}
-      <button
-        onClick={toggleSidebar}
-        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-bg-panel border border-border
-                   flex items-center justify-center text-txt-muted hover:text-txt-primary
-                   hover:border-brand/30 transition-all duration-200 shadow-card z-50"
-      >
-        {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-      </button>
     </motion.aside>
   )
 }

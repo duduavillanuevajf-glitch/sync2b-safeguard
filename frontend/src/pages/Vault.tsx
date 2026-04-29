@@ -13,11 +13,14 @@ import { cn } from '@/utils/cn'
 
 const SERVICE_TYPES = ['', 'SIP','SSH','MySQL','PostgreSQL','SFTP','RDP','HTTPS','API','Email','Outro']
 
+type SavePayload = Partial<VaultItem> & { password?: string }
+
 export function Vault() {
   const { hasPermission } = useAuth()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [service, setService] = useState('')
+  const [category, setCategory] = useState('')
   const [view, setView] = useState<'table' | 'grid'>('table')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<VaultItem | null>(null)
@@ -25,22 +28,23 @@ export function Vault() {
   const [page, setPage] = useState(1)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['vault', { search, service, page }],
+    queryKey: ['vault', { search, service, category, page }],
     queryFn: () => {
       const params: Record<string, string | number | boolean> = { page }
-      if (search) params.search = search
-      if (service) params.service = service
+      if (search)   params.search   = search
+      if (service)  params.service  = service
+      if (category) params.category = category
       return vaultService.list(params)
     },
   })
 
   const createMut = useMutation({
-    mutationFn: (d: Partial<VaultItem>) => vaultService.create(d),
+    mutationFn: (d: SavePayload) => vaultService.create(d),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['vault'] }),
   })
 
   const updateMut = useMutation({
-    mutationFn: ({ id, d }: { id: string; d: Partial<VaultItem> }) => vaultService.update(id, d),
+    mutationFn: ({ id, d }: { id: string; d: SavePayload }) => vaultService.update(id, d),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['vault'] }),
   })
 
@@ -57,7 +61,7 @@ export function Vault() {
   const items: VaultItem[] = data?.items ?? []
   const meta = data?.meta ?? { total: 0, pages: 1 }
 
-  const handleSave = async (formData: Partial<VaultItem>) => {
+  const handleSave = async (formData: SavePayload) => {
     if (editing) {
       await updateMut.mutateAsync({ id: editing.id, d: formData })
     } else {
@@ -99,6 +103,28 @@ export function Vault() {
           </div>
         }
       />
+
+      {/* Category tabs */}
+      <div className="flex items-center gap-1 p-1 glass rounded-2xl border border-border self-start">
+        {[
+          { value: '',              label: 'Todas' },
+          { value: 'pessoal',      label: 'Pessoal' },
+          { value: 'compartilhada',label: 'Compartilhada' },
+        ].map(tab => (
+          <button
+            key={tab.value}
+            onClick={() => { setCategory(tab.value); setPage(1) }}
+            className={cn(
+              'px-4 py-1.5 rounded-xl text-sm font-medium transition-all duration-200',
+              category === tab.value
+                ? 'bg-brand text-white shadow-sm'
+                : 'text-txt-muted hover:text-txt-primary hover:bg-white/[0.04]'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">

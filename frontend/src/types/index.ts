@@ -38,10 +38,12 @@ export interface VaultItem {
   serviceType?: string
   username: string
   host?: string
+  dns?: string
   port?: number
-  database?: string
   notes?: string
   tags: string[]
+  category?: string
+  expiresAt?: string
   isArchived: boolean
   archivedAt?: string
   createdAt: string

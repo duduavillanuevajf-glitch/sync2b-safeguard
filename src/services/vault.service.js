@@ -7,6 +7,28 @@ const cryptoSvc = require('./crypto.service');
 const db = require('../config/database');
 const { NotFoundError, ForbiddenError, UnprocessableError } = require('../utils/errors');
 const { parsePagination } = require('../utils/pagination');
+
+function _toListItem(r) {
+  return {
+    id: r.id,
+    title: r.name,
+    serviceType: r.service || null,
+    username: r.username || null,
+    host: r.host || null,
+    dns: r.dns || null,
+    port: r.port || null,
+    notes: r.notes || null,
+    tags: r.tags || [],
+    category: r.category || null,
+    isArchived: r.is_archived || false,
+    archivedAt: r.archived_at || null,
+    expiresAt: r.expires_at || null,
+    createdAt: r.created_at || null,
+    updatedAt: r.updated_at || null,
+    createdByEmail: r.created_by_email || null,
+    staleDays: r.days_since_update || 0,
+  };
+}
 const XLSX = require('xlsx');
 const { stringify } = require('csv-stringify/sync');
 
@@ -74,17 +96,19 @@ async function listItems({ organizationId, query }) {
   const { page, limit, offset } = parsePagination(query);
   const isArchived = query.archived === 'true';
   const search = query.search || null;
+  const service = query.service || null;
+  const category = query.category || null;
 
   const [rows, total] = await Promise.all([
-    vaultRepo.list(organizationId, { isArchived, limit, offset, search }),
-    vaultRepo.countList(organizationId, { isArchived, search }),
+    vaultRepo.list(organizationId, { isArchived, limit, offset, search, service, category }),
+    vaultRepo.countList(organizationId, { isArchived, search, service, category }),
   ]);
 
   const org = await orgRepo.findById(organizationId);
   const alertDays = parseInt(query.alertDays, 10) || org?.alert_days || 90;
 
   const items = rows.map(r => ({
-    ...r,
+    ..._toListItem(r),
     alert: !isArchived && (r.days_since_update || 0) >= alertDays,
   }));
 
@@ -116,11 +140,11 @@ async function getItem({ id, organizationId, userId, ipAddress }) {
 
   return {
     id: item.id,
-    name: item.name,
+    title: item.name,
+    serviceType: item.service,
     host: item.host,
     dns: item.dns,
     port: item.port,
-    service: item.service,
     username: item.username,
     password,
     notes: item.notes,
@@ -268,7 +292,8 @@ async function deleteItem({ id, organizationId, userId, ipAddress }) {
 async function getStaleAlerts({ organizationId, alertDays }) {
   const org = await orgRepo.findById(organizationId);
   const days = alertDays || org?.alert_days || 90;
-  return vaultRepo.listStale(organizationId, days);
+  const rows = await vaultRepo.listStale(organizationId, days);
+  return rows.map(_toListItem);
 }
 
 // ── Export CSV ────────────────────────────────────────────────────────────────
