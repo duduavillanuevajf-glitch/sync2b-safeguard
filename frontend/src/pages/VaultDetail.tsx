@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { KeyRound, ArrowLeft, Edit, Trash2, Clock, Globe, Database, FileText, Tag, History } from 'lucide-react'
+import { KeyRound, ArrowLeft, Edit, Trash2, Clock, Globe, Database, FileText, Tag, History, UsersRound } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { vaultService } from '@/services/vault.service'
+import { teamsService } from '@/services/teams.service'
 import { CredentialModal } from '@/components/vault/CredentialModal'
 import { PasswordField } from '@/components/vault/PasswordField'
 import { ServiceBadge, StatusBadge, AlertBadge } from '@/components/ui/Badge'
@@ -39,6 +40,11 @@ export function VaultDetail() {
   const deleteMut = useMutation({
     mutationFn: () => vaultService.delete(id!),
     onSuccess: () => navigate('/credenciais'),
+  })
+
+  const { data: teams = [] } = useQuery({
+    queryKey: ['teams'],
+    queryFn: () => teamsService.list(),
   })
 
   if (isLoading) return (
@@ -77,12 +83,12 @@ export function VaultDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {hasPermission('vault:update') && (
+            {hasPermission('credential:update') && (
               <button onClick={() => setModalOpen(true)} className="btn-ghost flex items-center gap-1.5 text-sm">
                 <Edit className="w-4 h-4" /> Editar
               </button>
             )}
-            {hasPermission('vault:delete') && (
+            {hasPermission('credential:delete') && (
               <button onClick={() => setConfirmDelete(true)} className="btn-danger flex items-center gap-1.5 text-sm">
                 <Trash2 className="w-4 h-4" /> Excluir
               </button>
@@ -100,9 +106,27 @@ export function VaultDetail() {
           {/* Password */}
           <div className="space-y-1">
             <label className="text-xs font-semibold text-txt-secondary uppercase tracking-wide">Senha</label>
-            <PasswordField value="••••••••••••" readOnly />
-            <p className="text-xs text-txt-muted">A senha não é exibida por segurança. Clique em "Editar" para atualizar.</p>
+            <PasswordField value={item.password || ''} readOnly />
+            {!item.password && (
+              <p className="text-xs text-txt-muted">Não foi possível carregar a senha.</p>
+            )}
           </div>
+
+          {/* Equipe vinculada */}
+          {item.category === 'compartilhada' && item.teamId && (
+            <div className="flex items-center gap-2 text-sm text-txt-secondary">
+              <UsersRound className="w-4 h-4 text-txt-muted" />
+              <span>Equipe: <span className="font-medium text-txt-primary">
+                {teams.find(t => t.id === item.teamId)?.name || item.teamId}
+              </span></span>
+            </div>
+          )}
+          {item.category === 'compartilhada' && !item.teamId && (
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-warn/10 border border-warn/20">
+              <UsersRound className="w-4 h-4 text-warn" />
+              <p className="text-xs text-warn">Credencial compartilhada sem equipe vinculada. Edite para associar uma equipe.</p>
+            </div>
+          )}
 
           {/* Host + Port */}
           {(item.host || item.port) && (

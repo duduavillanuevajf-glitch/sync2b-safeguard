@@ -31,7 +31,7 @@ export function Dashboard() {
   const { data: alerts, isLoading: loadingAlerts } = useQuery({
     queryKey: ['vault-alerts'],
     queryFn: () => vaultService.getAlerts(90),
-    enabled: hasPermission('vault:read'),
+    enabled: hasPermission('credential:read'),
   })
 
   const { data: usersData, isLoading: loadingUsers } = useQuery({

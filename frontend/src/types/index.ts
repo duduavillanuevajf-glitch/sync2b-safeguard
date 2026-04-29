@@ -1,4 +1,4 @@
-export type Role = 'super_admin' | 'org_admin' | 'vault_manager' | 'vault_viewer'
+export type Role = 'super_admin' | 'org_admin' | 'vault_manager' | 'vault_viewer' | string
 
 export interface Organization {
   id: string
@@ -37,6 +37,7 @@ export interface VaultItem {
   title: string
   serviceType?: string
   username: string
+  password?: string
   host?: string
   dns?: string
   port?: number
@@ -44,13 +45,36 @@ export interface VaultItem {
   tags: string[]
   category?: string
   teamId?: string
+  createdBy?: string
+  createdByEmail?: string
   expiresAt?: string
   isArchived: boolean
   archivedAt?: string
   createdAt: string
   updatedAt: string
-  createdByEmail?: string
   staleDays?: number
+}
+
+export interface Tag {
+  id: string
+  name: string
+  color: string
+  category?: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CustomRole {
+  id: string
+  name: string
+  slug: string
+  description?: string | null
+  permissions: string[]
+  isSystem: boolean
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface AuditLog {

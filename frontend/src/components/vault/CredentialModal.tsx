@@ -1,24 +1,28 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronDown, Sparkles, User, Globe, Server, Tag, Calendar, Shield } from 'lucide-react'
+import { X, ChevronDown, Sparkles, User, Globe, Server, Tag, Calendar, Shield, UsersRound } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useQuery } from '@tanstack/react-query'
 import type { VaultItem } from '@/types'
 import { PasswordField } from './PasswordField'
 import { PasswordGenerator } from './PasswordGenerator'
 import { cn } from '@/utils/cn'
+import { teamsService } from '@/services/teams.service'
+import { tagsService } from '@/services/tags.service'
 
 const SERVICE_TYPES = ['SIP','SSH','MySQL','PostgreSQL','SFTP','RDP','HTTPS','API','Email','Outro']
 const CATEGORIES = [
   { value: '',              label: 'Sem categoria' },
-  { value: 'pessoal',      label: 'Pessoal' },
-  { value: 'compartilhada',label: 'Compartilhada' },
+  { value: 'pessoal',      label: 'Pessoal (só o criador vê)' },
+  { value: 'compartilhada',label: 'Compartilhada (por equipe)' },
 ]
 
 const schema = z.object({
   title:       z.string().min(1, 'Nome obrigatório'),
   category:    z.string().optional(),
+  teamId:      z.string().optional(),
   serviceType: z.string().min(1),
   username:    z.string().min(1, 'Usuário obrigatório'),
   password:    z.string().optional(),
@@ -26,8 +30,12 @@ const schema = z.object({
   dns:         z.string().optional(),
   port:        z.coerce.number().int().min(1).max(65535).optional().or(z.literal('')),
   notes:       z.string().optional(),
-  tags:        z.string().optional(),
+  tags:        z.array(z.string()).optional(),
   expiresAt:   z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.category === 'compartilhada' && !data.teamId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Equipe obrigatória para credencial compartilhada', path: ['teamId'] })
+  }
 })
 
 type FormData = z.infer<typeof schema>
@@ -39,10 +47,10 @@ interface Props {
   onSave: (data: Partial<VaultItem> & { password?: string }) => Promise<void>
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
     <label className="text-[10px] font-bold text-txt-muted uppercase tracking-widest">
-      {children}
+      {children}{required && <span className="text-danger ml-0.5">*</span>}
     </label>
   )
 }
@@ -52,11 +60,26 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
   const [saving, setSaving] = useState(false)
 
   const {
-    register, handleSubmit, control, setValue, setError, reset,
+    register, handleSubmit, control, setValue, setError, reset, watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { serviceType: 'HTTPS', category: '' },
+    defaultValues: { serviceType: 'HTTPS', category: '', tags: [] },
+  })
+
+  const selectedCategory = watch('category')
+  const selectedTags = watch('tags') || []
+
+  const { data: teams = [] } = useQuery({
+    queryKey: ['teams'],
+    queryFn: () => teamsService.list(),
+    enabled: open,
+  })
+
+  const { data: availableTags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: () => tagsService.list(),
+    enabled: open,
   })
 
   useEffect(() => {
@@ -64,6 +87,7 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
       reset({
         title:       item.title,
         category:    item.category || '',
+        teamId:      item.teamId || '',
         serviceType: item.serviceType || 'HTTPS',
         username:    item.username,
         password:    '',
@@ -71,14 +95,23 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
         dns:         item.dns || '',
         port:        item.port || '',
         notes:       item.notes || '',
-        tags:        item.tags?.join(', ') || '',
+        tags:        item.tags || [],
         expiresAt:   item.expiresAt ? item.expiresAt.substring(0, 10) : '',
       })
     } else {
-      reset({ serviceType: 'HTTPS', category: '' })
+      reset({ serviceType: 'HTTPS', category: '', tags: [] })
     }
     setShowGenerator(false)
   }, [item, open, reset])
+
+  const toggleTag = (tagName: string) => {
+    const current = selectedTags
+    if (current.includes(tagName)) {
+      setValue('tags', current.filter(t => t !== tagName))
+    } else {
+      setValue('tags', [...current, tagName])
+    }
+  }
 
   const onSubmit = async (data: FormData) => {
     if (!item && !data.password) {
@@ -91,13 +124,14 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
         title:       data.title,
         serviceType: data.serviceType,
         category:    data.category || undefined,
+        teamId:      data.category === 'compartilhada' ? data.teamId : undefined,
         username:    data.username,
         password:    data.password || undefined,
         host:        data.host || undefined,
         dns:         data.dns || undefined,
         port:        data.port ? Number(data.port) : undefined,
         notes:       data.notes || undefined,
-        tags:        data.tags ? data.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        tags:        data.tags || [],
         expiresAt:   data.expiresAt || undefined,
       })
       onClose()
@@ -153,7 +187,7 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                    <FieldLabel>Nome *</FieldLabel>
+                    <FieldLabel required>Nome</FieldLabel>
                     <input
                       {...register('title')}
                       className="input-field"
@@ -176,6 +210,32 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
                   </div>
                 </div>
 
+                {/* Equipe — obrigatória quando categoria = compartilhada */}
+                <AnimatePresence>
+                  {selectedCategory === 'compartilhada' && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-1.5"
+                    >
+                      <FieldLabel required>Equipe vinculada</FieldLabel>
+                      <div className="relative">
+                        <UsersRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-txt-muted pointer-events-none" />
+                        <select {...register('teamId')} className="input-field appearance-none pl-10 pr-8">
+                          <option value="">— Selecione a equipe —</option>
+                          {teams.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-txt-muted pointer-events-none" />
+                      </div>
+                      {errors.teamId && <p className="text-danger text-xs">{errors.teamId.message}</p>}
+                      <p className="text-xs text-txt-muted">Apenas membros desta equipe terão acesso.</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className="space-y-1.5">
                   <FieldLabel>Tipo de serviço</FieldLabel>
                   <div className="relative">
@@ -195,7 +255,7 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
                 </p>
 
                 <div className="space-y-1.5">
-                  <FieldLabel>Usuário *</FieldLabel>
+                  <FieldLabel required>Usuário</FieldLabel>
                   <div className="relative">
                     <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-txt-muted" />
                     <input
@@ -209,7 +269,7 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <FieldLabel>{item ? 'Senha (deixe vazio para manter)' : 'Senha *'}</FieldLabel>
+                    <FieldLabel>{item ? 'Senha (vazio = manter)' : 'Senha'}{!item && <span className="text-danger ml-0.5">*</span>}</FieldLabel>
                     <button
                       type="button"
                       onClick={() => setShowGenerator(v => !v)}
@@ -302,17 +362,44 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
                   Metadados
                 </p>
 
+                {/* Tags reais */}
                 <div className="space-y-1.5">
                   <FieldLabel>Tags</FieldLabel>
-                  <div className="relative">
-                    <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-txt-muted" />
-                    <input
-                      {...register('tags')}
-                      className="input-field pl-10"
-                      placeholder="produção, crítico, backend"
-                    />
-                  </div>
-                  <p className="text-xs text-txt-muted">Separe por vírgula</p>
+                  {availableTags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableTags.map(tag => {
+                        const selected = selectedTags.includes(tag.name)
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => toggleTag(tag.name)}
+                            className={cn(
+                              'px-2.5 py-1 rounded-lg text-xs font-medium border transition-all',
+                              selected
+                                ? 'bg-brand/20 border-brand/40 text-brand'
+                                : 'bg-bg-elevated border-border text-txt-muted hover:border-brand/30 hover:text-txt-primary'
+                            )}
+                            style={selected ? {} : { borderColor: tag.color + '40' }}
+                          >
+                            <span
+                              className="inline-block w-2 h-2 rounded-full mr-1.5"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            {tag.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-bg-elevated border border-border">
+                      <Tag className="w-4 h-4 text-txt-muted" />
+                      <p className="text-xs text-txt-muted">Nenhuma tag cadastrada. Crie em <span className="text-brand">Tags</span> no menu lateral.</p>
+                    </div>
+                  )}
+                  {selectedTags.length > 0 && (
+                    <p className="text-xs text-txt-muted">{selectedTags.length} tag(s) selecionada(s)</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">

@@ -81,7 +81,16 @@ async function deleteTeam(req, res, next) {
 
 async function listMembers(req, res, next) {
   try {
-    const members = await teamsRepo.listMembers(req.params.id, req.user.organizationId);
+    const rows = await teamsRepo.listMembers(req.params.id, req.user.organizationId);
+    const members = rows.map(m => ({
+      userId: m.id,
+      email: m.email,
+      firstName: m.first_name || null,
+      lastName: m.last_name || null,
+      role: m.role,
+      isActive: m.is_active,
+      addedAt: m.added_at,
+    }));
     success(res, members);
   } catch (err) { next(err); }
 }

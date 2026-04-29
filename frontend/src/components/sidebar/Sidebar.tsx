@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, KeyRound, ScrollText, Users,
   Upload, Bell, Settings, User, ChevronLeft, ChevronRight,
-  LogOut, Building2, ShieldCheck, UsersRound,
+  LogOut, Building2, ShieldCheck, UsersRound, Tag,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { getRoleLabel } from '@/utils/format'
 import { useAuthStore } from '@/store/auth.store'
 import { useUIStore } from '@/store/ui.store'
 import { authService } from '@/services/auth.service'
@@ -18,6 +19,7 @@ const NAV = [
   { to: '/audit',          icon: ScrollText,      label: 'Auditoria',      section: 'manage' },
   { to: '/users',          icon: Users,           label: 'Usuários',       section: 'manage' },
   { to: '/equipes',        icon: UsersRound,      label: 'Equipes',        section: 'manage' },
+  { to: '/tags',           icon: Tag,             label: 'Tags',           section: 'manage' },
   { to: '/organizacoes',   icon: Building2,       label: 'Organizações',   section: 'manage' },
   { to: '/permissions',    icon: ShieldCheck,     label: 'Permissões',     section: 'manage' },
   { to: '/settings',       icon: Settings,        label: 'Configurações',  section: 'system' },
@@ -166,7 +168,7 @@ export function Sidebar() {
                 <p className="text-sm font-medium text-txt-primary truncate">
                   {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user?.email}
                 </p>
-                <p className="text-[11px] text-txt-muted truncate">{user?.role?.replace('_', ' ')}</p>
+                <p className="text-[11px] text-txt-muted truncate">{user?.role ? getRoleLabel(user.role) : ''}</p>
               </motion.div>
             )}
           </AnimatePresence>

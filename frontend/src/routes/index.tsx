@@ -13,6 +13,7 @@ import { Users } from '@/pages/Users'
 import { Teams } from '@/pages/Teams'
 import { Organizations } from '@/pages/Organizations'
 import { Permissions } from '@/pages/Permissions'
+import { Tags } from '@/pages/Tags'
 import { Import } from '@/pages/Import'
 import { Alerts } from '@/pages/Alerts'
 import { Settings } from '@/pages/Settings'
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
       { path: 'equipes', element: <Teams /> },
       { path: 'organizacoes', element: <Organizations /> },
       { path: 'permissions', element: <Permissions /> },
+      { path: 'tags', element: <Tags /> },
       { path: 'import', element: <Import /> },
       { path: 'alerts', element: <Alerts /> },
       { path: 'settings', element: <Settings /> },

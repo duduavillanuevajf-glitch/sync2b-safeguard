@@ -90,7 +90,7 @@ function UserModal({ user, onClose, onSave }: { user?: User | null; onClose: () 
             <label className="text-xs font-semibold text-txt-secondary uppercase tracking-wide">Função</label>
             <select {...(user ? (editForm.register as any) : createForm.register)('role')} className="input-field appearance-none">
               <option value="vault_viewer">Visualizador</option>
-              <option value="vault_manager">Gerenciador</option>
+              <option value="vault_manager">Gestor</option>
               <option value="org_admin">Administrador</option>
             </select>
           </div>

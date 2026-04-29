@@ -19,9 +19,9 @@ export function useAuth() {
     if (!user) return false
     const rolePerms: Record<string, string[]> = {
       super_admin: ['*'],
-      org_admin: ['vault:read','vault:create','vault:update','vault:delete','vault:export','vault:import','vault:toggle','users:read','users:create','users:update','users:delete','audit:read','org:manage'],
-      vault_manager: ['vault:read','vault:create','vault:update','vault:delete','vault:export','vault:import','vault:toggle','audit:read'],
-      vault_viewer: ['vault:read'],
+      org_admin: ['credential:read','credential:create','credential:update','credential:delete','credential:export','credential:import','credential:toggle','users:read','users:create','users:update','users:delete','audit:read','org:manage','tags:manage','roles:manage'],
+      vault_manager: ['credential:read','credential:create','credential:update','credential:delete','credential:export','credential:import','credential:toggle','audit:read','tags:manage'],
+      vault_viewer: ['credential:read'],
     }
     const perms = rolePerms[user.role] || []
     return perms.includes('*') || perms.includes(permission)

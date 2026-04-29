@@ -88,13 +88,13 @@ export function Vault() {
         description={`${meta.total} credenciais`}
         actions={
           <div className="flex items-center gap-2">
-            {hasPermission('vault:export') && (
+            {hasPermission('credential:export') && (
               <button onClick={handleExport} className="btn-ghost flex items-center gap-2 text-sm">
                 <Download className="w-4 h-4" />
                 Exportar
               </button>
             )}
-            {hasPermission('vault:create') && (
+            {hasPermission('credential:create') && (
               <button onClick={openNew} className="btn-primary flex items-center gap-2 text-sm">
                 <Plus className="w-4 h-4" />
                 Nova credencial
@@ -169,8 +169,8 @@ export function Vault() {
               onEdit={openEdit}
               onDelete={setConfirmDelete}
               onToggle={item => toggleMut.mutate(item.id)}
-              canEdit={hasPermission('vault:update')}
-              canDelete={hasPermission('vault:delete')}
+              canEdit={hasPermission('credential:update')}
+              canDelete={hasPermission('credential:delete')}
             />
           </motion.div>
         ) : (
@@ -186,8 +186,8 @@ export function Vault() {
                   onView={() => openEdit(item)}
                   onEdit={() => openEdit(item)}
                   onDelete={() => setConfirmDelete(item)}
-                  canEdit={hasPermission('vault:update')}
-                  canDelete={hasPermission('vault:delete')}
+                  canEdit={hasPermission('credential:update')}
+                  canDelete={hasPermission('credential:delete')}
                 />
               ))
             }

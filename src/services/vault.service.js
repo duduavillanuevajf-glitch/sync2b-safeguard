@@ -111,11 +111,28 @@ async function listItems({ organizationId, userId, query }) {
   return { items, total, page, limit };
 }
 
+// ── Visibility check ─────────────────────────────────────────────────────────
+
+async function _assertCanAccess(item, userId) {
+  if (item.category === 'pessoal') {
+    if (item.created_by !== userId) throw new ForbiddenError('Acesso negado a credencial pessoal');
+    return;
+  }
+  if (item.category === 'compartilhada' && item.team_id) {
+    const teamsRepo = require('../repositories/teams.repository');
+    const members = await teamsRepo.listMembers(item.team_id, item.organization_id);
+    const inTeam = members.some(m => m.id === userId) || item.created_by === userId;
+    if (!inTeam) throw new ForbiddenError('Acesso negado: você não pertence à equipe desta credencial');
+  }
+}
+
 // ── Get by ID (with decryption) ───────────────────────────────────────────────
 
 async function getItem({ id, organizationId, userId, ipAddress }) {
   const item = await vaultRepo.findById(id, organizationId);
   if (!item) throw new NotFoundError('Credencial');
+
+  await _assertCanAccess(item, userId);
 
   const password = await cryptoSvc.decrypt(
     item.encrypted_password,
@@ -146,7 +163,9 @@ async function getItem({ id, organizationId, userId, ipAddress }) {
     notes: item.notes,
     tags: item.tags,
     category: item.category,
-    teamId: item.team_id,
+    teamId: item.team_id || null,
+    createdBy: item.created_by,
+    createdByEmail: item.created_by_email || null,
     expiresAt: item.expires_at,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
@@ -161,6 +180,8 @@ async function updateItem({ id, organizationId, userId, data, ipAddress }) {
     const current = await vaultRepo.findById(id, organizationId, trx);
     if (!current) throw new NotFoundError('Credencial');
 
+    await _assertCanAccess(current, userId);
+
     const changes = _detectChanges(current, data);
     const updatePayload = {
       name: data.name,
@@ -172,6 +193,7 @@ async function updateItem({ id, organizationId, userId, data, ipAddress }) {
       notes: data.notes || null,
       tags: data.tags || [],
       category: data.category || null,
+      team_id: data.teamId !== undefined ? (data.teamId || null) : current.team_id,
       expires_at: data.expiresAt || null,
     };
 
@@ -250,8 +272,8 @@ async function toggleArchive({ id, organizationId, userId, ipAddress }) {
   await auditRepo.logVaultHistory({ vaultItemId: id, organizationId, userId, action, ipAddress });
   await auditRepo.log({
     organizationId, userId,
-    action: `VAULT_ITEM_${action}`,
-    resourceType: 'vault_item',
+    action: `CREDENTIAL_${action}`,
+    resourceType: 'credential',
     resourceId: id,
     ipAddress,
   });
@@ -265,6 +287,7 @@ async function deleteItem({ id, organizationId, userId, ipAddress }) {
   return db.transaction(async (trx) => {
     const item = await vaultRepo.findById(id, organizationId, trx);
     if (!item) throw new NotFoundError('Credencial');
+    await _assertCanAccess(item, userId);
 
     await auditRepo.logVaultHistory({
       vaultItemId: id, organizationId, userId, action: 'DELETED',
@@ -273,8 +296,8 @@ async function deleteItem({ id, organizationId, userId, ipAddress }) {
 
     await auditRepo.log({
       organizationId, userId,
-      action: 'VAULT_ITEM_DELETED',
-      resourceType: 'vault_item',
+      action: 'CREDENTIAL_DELETED',
+      resourceType: 'credential',
       resourceId: id,
       ipAddress,
       metadata: { name: item.name },
@@ -323,7 +346,7 @@ async function exportCsv({ organizationId, userId, ipAddress }) {
 
   await auditRepo.log({
     organizationId, userId,
-    action: 'VAULT_EXPORTED',
+    action: 'CREDENTIAL_EXPORTED',
     metadata: { format: 'csv', count: rows.length },
     ipAddress,
   });
@@ -360,7 +383,7 @@ async function exportXlsx({ organizationId, userId, ipAddress }) {
 
   await auditRepo.log({
     organizationId, userId,
-    action: 'VAULT_EXPORTED',
+    action: 'CREDENTIAL_EXPORTED',
     metadata: { format: 'xlsx', count: rows.length },
     ipAddress,
   });

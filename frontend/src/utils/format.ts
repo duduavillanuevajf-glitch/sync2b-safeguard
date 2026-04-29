@@ -50,6 +50,10 @@ export const SERVICE_COLORS: Record<string, { bg: string; text: string; border: 
 export const ROLE_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
   super_admin:   { label: 'Super Admin',    bg: 'bg-brand/10',    text: 'text-brand',    border: 'border-brand/25'    },
   org_admin:     { label: 'Admin',          bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/25' },
-  vault_manager: { label: 'Vault Manager',  bg: 'bg-violet-500/10',text:'text-violet-400',border:'border-violet-500/25'},
-  vault_viewer:  { label: 'Viewer',         bg: 'bg-slate-500/10',text: 'text-slate-400',border: 'border-slate-500/25'},
+  vault_manager: { label: 'Gestor',         bg: 'bg-violet-500/10',text:'text-violet-400',border:'border-violet-500/25'},
+  vault_viewer:  { label: 'Visualizador',   bg: 'bg-slate-500/10',text: 'text-slate-400',border: 'border-slate-500/25'},
+}
+
+export function getRoleLabel(role: string): string {
+  return ROLE_CONFIG[role]?.label || role.replace(/_/g, ' ')
 }

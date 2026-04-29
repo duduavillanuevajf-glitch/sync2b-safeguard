@@ -13,6 +13,7 @@ const vaultItem = Joi.object({
   notes: Joi.string().max(5000).optional().allow('', null),
   tags: Joi.array().items(Joi.string().max(50)).max(20).optional().default([]),
   category: Joi.string().max(100).optional().allow('', null),
+  teamId: Joi.string().uuid().optional().allow(null),
   expiresAt: Joi.date().iso().min('now').optional().allow(null),
 });
 
