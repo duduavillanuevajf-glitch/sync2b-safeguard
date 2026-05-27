@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronDown, Sparkles, User, Globe, Server, Tag, Calendar, Shield, UsersRound } from 'lucide-react'
+import { X, ChevronDown, Sparkles, User, Globe, Server, Tag, Calendar, Shield, UsersRound, Eye } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery } from '@tanstack/react-query'
 import type { VaultItem } from '@/types'
 import { PasswordField } from './PasswordField'
+import { vaultService } from '@/services/vault.service'
+import { useAuth } from '@/hooks/useAuth'
 import { PasswordGenerator } from './PasswordGenerator'
 import { cn } from '@/utils/cn'
 import { teamsService } from '@/services/teams.service'
@@ -58,6 +60,8 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 export function CredentialModal({ open, item, onClose, onSave }: Props) {
   const [showGenerator, setShowGenerator] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [loadingCurrentPwd, setLoadingCurrentPwd] = useState(false)
+  const { hasPermission } = useAuth()
 
   const {
     register, handleSubmit, control, setValue, setError, reset, watch,
@@ -103,6 +107,17 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
     }
     setShowGenerator(false)
   }, [item, open, reset])
+
+  const handleLoadCurrentPassword = async () => {
+    if (!item?.id) return
+    setLoadingCurrentPwd(true)
+    try {
+      const result = await vaultService.revealSecret(item.id)
+      setValue('password', result.password)
+    } finally {
+      setLoadingCurrentPwd(false)
+    }
+  }
 
   const toggleTag = (tagName: string) => {
     const current = selectedTags
@@ -294,6 +309,17 @@ export function CredentialModal({ open, item, onClose, onSave }: Props) {
                       />
                     )}
                   />
+                  {item && hasPermission('credential:view_secret') && (
+                    <button
+                      type="button"
+                      onClick={handleLoadCurrentPassword}
+                      disabled={loadingCurrentPwd}
+                      className="flex items-center gap-1.5 text-xs text-txt-muted hover:text-brand transition-colors disabled:opacity-50"
+                    >
+                      <Eye className="w-3 h-3" />
+                      {loadingCurrentPwd ? 'Carregando...' : 'Carregar senha atual'}
+                    </button>
+                  )}
                   {errors.password && <p className="text-danger text-xs">{errors.password.message}</p>}
 
                   <AnimatePresence>

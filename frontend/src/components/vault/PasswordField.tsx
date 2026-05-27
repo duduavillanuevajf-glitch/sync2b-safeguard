@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function PasswordField({ value, showStrength, className, readOnly, onChange, placeholder }: Props) {
-  const [visible, setVisible] = useState(false)
+  const [visible, setVisible] = useState(readOnly === true)
   const [copied, setCopied] = useState(false)
 
   const strength = showStrength ? checkStrength(value) : null
